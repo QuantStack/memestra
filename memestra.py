@@ -55,6 +55,12 @@ for dlocal in duc.locals[module]:
 deprecate_uses = []
 for deprecated_function in deprecated_functions:
     for user in duc.chains[deprecated_function].users():
+        user_ancestors = (n
+                          for n in ancestors.parents(user.node)
+                          if isinstance(n, ast.FunctionDef))
+        if any(f in deprecated_functions for f in user_ancestors):
+            continue
+
         deprecate_uses.append((deprecated_function.name,
                                args.input.name,
                                user.node.lineno,
