@@ -11,7 +11,7 @@ class TestImports(TestCase):
 
     def checkDeprecatedUses(self, code, expected_output):
         sio = StringIO(dedent(code))
-        output = memestra.memestra(sio, 'decorator.deprecated')
+        output = memestra.memestra(sio, ('decorator', 'deprecated'))
         self.assertEqual(output, expected_output)
 
     def test_import_from(self):

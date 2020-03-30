@@ -3,19 +3,22 @@ from textwrap import dedent
 from io import StringIO
 import memestra
 
-class TestBasic(TestCase):
+import os
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'misc'))
+
+class TestMultiAttr(TestCase):
 
     def checkDeprecatedUses(self, code, expected_output):
         sio = StringIO(dedent(code))
-        output = memestra.memestra(sio, ('decorator', 'deprecated'))
+        output = memestra.memestra(sio, ('decorator', 'sub', 'deprecated'))
         self.assertEqual(output, expected_output)
-
 
     def test_import(self):
         code = '''
             import decorator
 
-            @decorator.deprecated
+            @decorator.sub.deprecated
             def foo(): pass
 
             def bar():
@@ -29,9 +32,25 @@ class TestBasic(TestCase):
 
     def test_import_alias(self):
         code = '''
-            import decorator as dec
+            import decorator as dp
 
-            @dec.deprecated
+            @dp.sub.deprecated
+            def foo(): pass
+
+            def bar():
+                foo()
+
+            foo()'''
+
+        self.checkDeprecatedUses(
+            code,
+            [('foo', '<>', 8, 4), ('foo', '<>', 10, 0)])
+
+    def test_import_sub_alias(self):
+        code = '''
+            import decorator.sub as dp
+
+            @dp.deprecated
             def foo(): pass
 
             def bar():
@@ -45,7 +64,7 @@ class TestBasic(TestCase):
 
     def test_import_from(self):
         code = '''
-            from decorator import deprecated
+            from decorator.sub import deprecated
 
             @deprecated
             def foo(): pass
@@ -61,7 +80,7 @@ class TestBasic(TestCase):
 
     def test_import_from_alias(self):
         code = '''
-            from decorator import deprecated as dp
+            from decorator.sub import deprecated as dp
 
             @dp
             def foo(): pass
@@ -74,20 +93,3 @@ class TestBasic(TestCase):
         self.checkDeprecatedUses(
             code,
             [('foo', '<>', 8, 4), ('foo', '<>', 10, 0)])
-
-    def test_call_from_deprecated(self):
-        code = '''
-            from decorator import deprecated as dp
-
-            @dp
-            def foo(): pass
-
-            @dp
-            def bar():
-                foo()
-
-            foo()'''
-
-        self.checkDeprecatedUses(
-            code,
-            [('foo', '<>', 11, 0),])

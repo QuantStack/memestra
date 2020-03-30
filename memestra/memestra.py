@@ -19,7 +19,7 @@ class ImportResolver(ast.NodeVisitor):
 
     def __init__(self, decorator):
         self.deprecated = None
-        self.decorator_module, self.decorator_func = decorator.split('.')
+        self.decorator = decorator
 
     def visit_Import(self, node):
         for alias in node.names:
@@ -87,24 +87,39 @@ class ImportResolver(ast.NodeVisitor):
 
         for dlocal in duc.locals[node]:
             dnode = dlocal.node
-            if isinstance(dnode, ast.alias):
-                original_name = dnode.name
-            if original_name == self.decorator_module:
+            if not isinstance(dnode, ast.alias):
+                continue
+
+            original_path = tuple(dnode.name.split('.'))
+            nbterms = len(original_path)
+
+            if original_path == self.decorator[:nbterms]:
                 for user in dlocal.users():
-                    grand_parent, parent = ancestors.parents(user.node)[-2:]
-                    # We could handle more situations, incl. renaming
-                    if not isinstance(parent, ast.Attribute):
+                    parents = list(ancestors.parents(user.node))
+                    attrs = list(reversed(self.decorator[nbterms:]))
+                    while attrs and parents:
+                        attr = attrs[-1]
+                        parent = parents.pop()
+                        if not isinstance(parent, (ast.Attribute)):
+                            break
+                        if parent.attr != attr:
+                            break
+                        attrs.pop()
+
+                    # path parsing fails if some attr left
+                    if attrs:
                         continue
-                    if parent.attr != self.decorator_func:
+
+                    # Only handle decorators attached to a fdef
+                    if not isinstance(parents[-1], ast.FunctionDef):
                         continue
-                    if not isinstance(grand_parent, ast.FunctionDef):
-                        continue
-                    deprecated.add(grand_parent)
-            elif original_name == self.decorator_func:
+                    deprecated.add(parents[-1])
+
+            elif original_path == self.decorator[-1:]:
                 parent = ancestors.parents(dlocal.node)[-1]
                 if not isinstance(parent, ast.ImportFrom):
                     continue
-                if parent.module != self.decorator_module:
+                if parent.module != '.'.join(self.decorator[:-1]):
                     continue
                 for user in dlocal.users():
                     parent = ancestors.parents(user.node)[-1]
@@ -131,8 +146,11 @@ def memestra(file_descriptor, decorator):
     (function, filename, line, colno) tuples. Each elements
     represents a code location where a deprecated function is used.
     A deprecated function is a function flagged by `decorator`, where
-    `decorator` is a string of the form 'module.attribute'
+    `decorator` is a tuple representing an import path,
+    e.g. (module, attribute)
     '''
+
+    assert len(decorator) > 1, "decorator is at least (module, attribute)"
 
     module = ast.parse(file_descriptor.read())
 
@@ -175,7 +193,7 @@ def run():
 
     args = parser.parse_args()
 
-    deprecate_uses = memestra(args.input, args.decorator)
+    deprecate_uses = memestra(args.input, args.decorator.split('.'))
 
     for fname, fd, lineno, colno in deprecate_uses:
         print("{} used at {}:{}:{}".format(fname, fd, lineno, colno + 1))
