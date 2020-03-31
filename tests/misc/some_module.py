@@ -1,4 +1,4 @@
-from decorator import deprecated
+from decoratortest import deprecated
 
 @deprecated
 def foo(): pass
