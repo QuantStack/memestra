@@ -3,6 +3,7 @@ from io import StringIO
 from collections import namedtuple
 import nbformat
 
+
 def nbmemestra(nbfile, decorator):
     # Get code cells
     cells = nbformat.read(nbfile, 4).cells
@@ -27,9 +28,12 @@ def nbmemestra(nbfile, decorator):
     result = []
     for d in deprecated_list:
         cell = next(x for x in cell_list if x.begin <= d[2] and d[2] < x.end)
-        result.append((d[0], 'Cell[' + str(cell.id) + ']', d[2] - cell.begin + 1, d[3]))
+        result.append((d[0],
+                       'Cell[' + str(cell.id) + ']', d[2] - cell.begin + 1,
+                       d[3]))
 
     return result
+
 
 def register(dispatcher):
     dispatcher['.ipynb'] = nbmemestra
