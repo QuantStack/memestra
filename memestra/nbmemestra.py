@@ -31,3 +31,5 @@ def nbmemestra(nbfile, decorator):
 
     return result
 
+def register(dispatcher):
+    dispatcher['.ipynb'] = nbmemestra
