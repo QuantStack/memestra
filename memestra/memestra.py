@@ -2,6 +2,7 @@ import beniget
 import sys
 import gast as ast
 import os
+from collections import defaultdict
 
 
 # FIXME: this only handles module name not subpackages
@@ -183,6 +184,7 @@ def memestra(file_descriptor, decorator):
 def run():
 
     import argparse
+    from pkg_resources import iter_entry_points
 
     parser = argparse.ArgumentParser(description='Check decorator usage.')
     parser.add_argument('--decorator', dest='decorator',
@@ -191,9 +193,16 @@ def run():
     parser.add_argument('input', type=argparse.FileType('r'),
                         help='file to scan')
 
+    dispatcher = defaultdict(lambda: memestra)
+    for entry_point in iter_entry_points(group='memestra.plugins', name=None):
+        entry_point.load()(dispatcher)
+
     args = parser.parse_args()
 
-    deprecate_uses = memestra(args.input, args.decorator.split('.'))
+    _, extension = os.path.splitext(args.input.name)
+
+    deprecate_uses = dispatcher[extension](args.input,
+                                           args.decorator.split('.'))
 
     for fname, fd, lineno, colno in deprecate_uses:
         print("{} used at {}:{}:{}".format(fname, fd, lineno, colno + 1))

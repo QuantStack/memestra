@@ -1,11 +1,6 @@
-try:
-    from setuptools import setup
+from setuptools import setup
 
-    kw = {"test_suite": "tests"}
-except ImportError:
-    from distutils.core import setup
-
-    kw = {}
+kw = {"test_suite": "tests"}
 
 setup(
     name="memestra",
@@ -23,7 +18,10 @@ with a given decorator.""",
     license="BSD 3-Clause",
     install_requires=open("requirements.txt").read().splitlines(),
     entry_points={'console_scripts':
-                  ['memestra = memestra.memestra:run',]},
+                  ['memestra = memestra.memestra:run'],
+                  'memestra.plugins':
+                  [".ipynb = memestra.nbmemestra:register", ],
+                  },
     classifiers=[
         "Development Status :: 5 - Alpha",
         "Environment :: Console",
