@@ -4,6 +4,8 @@ import gast as ast
 import os
 from collections import defaultdict
 
+_defs = ast.AsyncFunctionDef, ast.ClassDef, ast.FunctionDef
+
 
 # FIXME: this only handles module name not subpackages
 def resolve_module(module_name):
@@ -111,8 +113,8 @@ class ImportResolver(ast.NodeVisitor):
                     if attrs:
                         continue
 
-                    # Only handle decorators attached to a fdef
-                    if not isinstance(parents[-1], ast.FunctionDef):
+                    # Only handle decorators attached to a def
+                    if not isinstance(parents[-1], _defs):
                         continue
                     deprecated.add(parents[-1])
 
@@ -124,7 +126,7 @@ class ImportResolver(ast.NodeVisitor):
                     continue
                 for user in dlocal.users():
                     parent = ancestors.parents(user.node)[-1]
-                    if not isinstance(parent, ast.FunctionDef):
+                    if not isinstance(parent, _defs):
                         continue
                     deprecated.add(parent)
 
@@ -132,7 +134,7 @@ class ImportResolver(ast.NodeVisitor):
 
 
 def prettyname(node):
-    if isinstance(node, ast.FunctionDef):
+    if isinstance(node, _defs):
         return node.name
     if isinstance(node, ast.Name):
         return node.id
@@ -168,7 +170,7 @@ def memestra(file_descriptor, decorator):
         for user in duc.chains[deprecated_node].users():
             user_ancestors = (n
                               for n in ancestors.parents(user.node)
-                              if isinstance(n, ast.FunctionDef))
+                              if isinstance(n, _defs))
             if any(f in resolver.deprecated for f in user_ancestors):
                 continue
 
