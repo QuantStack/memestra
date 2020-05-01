@@ -4,6 +4,7 @@ import gast as ast
 import os
 import hashlib
 import yaml
+import warnings
 from collections import defaultdict
 
 FORMAT_VERSION = 0
@@ -47,9 +48,16 @@ class ImportResolver(ast.NodeVisitor):
             cache_path = os.path.join(self.homedir, module_hash)
             if os.path.isfile(cache_path):
                 with open(cache_path) as cache_fd:
-                    data = yaml.load(cache_fd)
+                    data = yaml.load(cache_fd, Loader=yaml.SafeLoader)
                     if data['version'] == FORMAT_VERSION:
                         return set(data['obsolete_functions'])
+                    elif data['generator'] == 'manual':
+                        warnings.warn(
+                            ("skipping module {} because it has an obsolete, "
+                             "manually generated, cache file: {}")
+                            .format(module_name,
+                                   cache_path))
+                        return []
 
             with open(module_path) as fd:
                 module = ast.parse(fd.read())
@@ -62,6 +70,7 @@ class ImportResolver(ast.NodeVisitor):
                 dl = {d.name for d in deprecated}
                 with open(cache_path, 'w') as cache_fd:
                     data = {'version': FORMAT_VERSION,
+                            'generator': 'memestra',
                             'obsolete_functions': sorted(dl)}
                     yaml.dump(data, cache_fd)
                 return dl
