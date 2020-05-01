@@ -18,7 +18,8 @@ with a given decorator.""",
     license="BSD 3-Clause",
     install_requires=open("requirements.txt").read().splitlines(),
     entry_points={'console_scripts':
-                  ['memestra = memestra.memestra:run'],
+                  ['memestra = memestra.memestra:run',
+                   'memestra-cache = memestra.caching:run'],
                   'memestra.plugins':
                   [".ipynb = memestra.nbmemestra:register", ],
                   },

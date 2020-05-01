@@ -73,12 +73,12 @@ class Cache(object):
         else:
             user_config_dir = xdg_config_home
             memestra_dir = 'memestra'
-        self. homedir = os.path.expanduser(os.path.join(user_config_dir,
-                                                        memestra_dir))
-        os.makedirs(self.homedir, exist_ok=True)
+        self.cachedir = os.path.expanduser(os.path.join(user_config_dir,
+                                                       memestra_dir))
+        os.makedirs(self.cachedir, exist_ok=True)
 
     def _get_path(self, key):
-        return os.path.join(self.homedir, key.module_hash)
+        return os.path.join(self.cachedir, key.module_hash)
 
     def __contains__(self, key):
         cache_path = self._get_path(key)
@@ -97,19 +97,41 @@ class Cache(object):
         with open(cache_path, 'w') as yaml_fd:
             yaml.dump(data, yaml_fd)
 
+    def keys(self):
+        return os.listdir(self.cachedir)
+
+
+def run_set(args):
+    data = {'generator': 'manual',
+            'obsolete_functions': args.deprecated}
+    cache = Cache()
+    key = CacheKey(args.input)
+    cache[key] = data
+
+def run_list(args):
+    cache = Cache()
+    for k in cache.keys():
+        print(k)
 
 def run():
     import argparse
-    parser = argparse.ArgumentParser(description='Edit memestra cache.')
-    parser.add_argument('--deprecated', dest='deprecated',
-                        type=str, nargs='+',
-                        default='decorator.deprecated',
-                        help='function to flag as deprecated')
-    parser.add_argument('input', type=str,
-                        help='module.py to edit')
+    parser = argparse.ArgumentParser(
+        description='Interact with memestra cache')
+    subparsers = parser.add_subparsers()
 
-    data = {'generator': 'manual',
-            'obsolete_functions': parser.deprecated}
-    cache = Cache()
-    key = CacheKey(parser.input)
-    cache[key] = data
+    parser_set = subparsers.add_parser('set', help='Set a cache entry')
+    parser_set.add_argument('--deprecated', dest='deprecated',
+                            type=str, nargs='+',
+                            default='decorator.deprecated',
+                            help='function to flag as deprecated')
+    parser_set.add_argument('input', type=str,
+                            help='module.py to edit')
+    parser_set.set_defaults(runner=run_set)
+
+    parser_list = subparsers.add_parser('list', help='List cache entries')
+    parser_list.set_defaults(runner=run_list)
+
+    args = parser.parse_args()
+    args.runner(args)
+
+
