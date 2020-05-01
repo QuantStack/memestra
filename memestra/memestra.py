@@ -2,12 +2,9 @@ import beniget
 import sys
 import gast as ast
 import os
-import hashlib
-import yaml
 import warnings
 from collections import defaultdict
-
-FORMAT_VERSION = 0
+from memestra.caching import Cache, CacheKey, CacheVersion
 
 
 # FIXME: this only handles module name not subpackages
@@ -26,16 +23,7 @@ class ImportResolver(ast.NodeVisitor):
     def __init__(self, decorator):
         self.deprecated = None
         self.decorator = tuple(decorator)
-        xdg_config_home = os.environ.get('XDG_CONFIG_HOME', None)
-        if xdg_config_home is None:
-            user_config_dir = '~'
-            memestra_dir = '.memestra'
-        else:
-            user_config_dir = xdg_config_home
-            memestra_dir = 'memestra'
-        self.homedir = os.path.expanduser(os.path.join(user_config_dir,
-                                                       memestra_dir))
-        os.makedirs(self.homedir, exist_ok=True)
+        self.cache = Cache()
 
     def load_deprecated_from_module(self, module_name):
         module_path = resolve_module(module_name)
@@ -43,37 +31,34 @@ class ImportResolver(ast.NodeVisitor):
         if module_path is None:
             return None
 
-        with open(module_path, 'rb') as fd:
-            module_hash = hashlib.sha256(fd.read()).hexdigest()
-            cache_path = os.path.join(self.homedir, module_hash)
-            if os.path.isfile(cache_path):
-                with open(cache_path) as cache_fd:
-                    data = yaml.load(cache_fd, Loader=yaml.SafeLoader)
-                    if data['version'] == FORMAT_VERSION:
-                        return set(data['obsolete_functions'])
-                    elif data['generator'] == 'manual':
-                        warnings.warn(
-                            ("skipping module {} because it has an obsolete, "
-                             "manually generated, cache file: {}")
-                            .format(module_name,
-                                   cache_path))
-                        return []
+        module_key = CacheKey(module_path)
 
-            with open(module_path) as fd:
-                module = ast.parse(fd.read())
-                duc = beniget.DefUseChains()
-                duc.visit(module)
-                anc = beniget.Ancestors()
-                anc.visit(module)
+        if module_key in self.cache:
+            data = self.cache[module_key]
+            if data['version'] == CacheVersion:
+                return set(data['obsolete_functions'])
+            elif data['generator'] == 'manual':
+                warnings.warn(
+                    ("skipping module {} because it has an obsolete, "
+                     "manually generated, cache file: {}")
+                    .format(module_name,
+                            module_key.module_hash))
+                return []
 
-                deprecated = self.collect_deprecated(module, duc, anc)
-                dl = {d.name for d in deprecated}
-                with open(cache_path, 'w') as cache_fd:
-                    data = {'version': FORMAT_VERSION,
-                            'generator': 'memestra',
-                            'obsolete_functions': sorted(dl)}
-                    yaml.dump(data, cache_fd)
-                return dl
+        with open(module_path) as fd:
+            module = ast.parse(fd.read())
+            duc = beniget.DefUseChains()
+            duc.visit(module)
+            anc = beniget.Ancestors()
+            anc.visit(module)
+
+            deprecated = self.collect_deprecated(module, duc, anc)
+            dl = {d.name for d in deprecated}
+            data = {'version': CacheVersion,
+                    'generator': 'memestra',
+                    'obsolete_functions': sorted(dl)}
+            self.cache[module_key] = data
+            return dl
 
     def visit_Import(self, node):
         for alias in node.names:
