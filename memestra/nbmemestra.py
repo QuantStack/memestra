@@ -22,7 +22,7 @@ def nbmemestra(nbfile, decorator):
     code = '\n'.join(code_list)
 
     # Collect calls to deprecated functions
-    deprecated_list = memestra(StringIO(code), ('decoratortest', 'deprecated'))
+    deprecated_list = memestra(StringIO(code), decorator)
 
     # Map them to cells
     result = []
