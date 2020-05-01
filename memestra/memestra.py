@@ -4,7 +4,7 @@ import gast as ast
 import os
 import warnings
 from collections import defaultdict
-from memestra.caching import Cache, CacheKey, CacheVersion
+from memestra.caching import Cache, CacheKey, Format
 
 
 # FIXME: this only handles module name not subpackages
@@ -35,7 +35,7 @@ class ImportResolver(ast.NodeVisitor):
 
         if module_key in self.cache:
             data = self.cache[module_key]
-            if data['version'] == CacheVersion:
+            if data['version'] == Format.version:
                 return set(data['obsolete_functions'])
             elif data['generator'] == 'manual':
                 warnings.warn(
@@ -54,8 +54,7 @@ class ImportResolver(ast.NodeVisitor):
 
             deprecated = self.collect_deprecated(module, duc, anc)
             dl = {d.name for d in deprecated}
-            data = {'version': CacheVersion,
-                    'generator': 'memestra',
+            data = {'generator': 'memestra',
                     'obsolete_functions': sorted(dl)}
             self.cache[module_key] = data
             return dl
