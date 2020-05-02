@@ -37,9 +37,9 @@ class TestCaching(TestCase):
             self.assertNotIn(key, cache)
             cache[key] = {}
             data = cache[key]
-            self.assertEquals(data['version'], memestra.caching.Format.version)
-            self.assertEquals(data['obsolete_functions'], [])
-            self.assertEquals(data['generator'], 'manual')
+            self.assertEqual(data['version'], memestra.caching.Format.version)
+            self.assertEqual(data['deprecated'], [])
+            self.assertEqual(data['generator'], 'manual')
         finally:
             shutil.rmtree(tmpdir)
 
@@ -51,7 +51,7 @@ class TestCaching(TestCase):
             key = memestra.caching.CacheKey(__file__)
             with self.assertRaises(ValueError):
                 cache[key] = {'version': -1,
-                              'obsolete_functions': [],
+                              'deprecated': [],
                               'generator': 'manual'}
         finally:
             shutil.rmtree(tmpdir)

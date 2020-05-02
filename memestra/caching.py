@@ -2,13 +2,15 @@ import os
 import hashlib
 import yaml
 
+from memestra.docparse import docparse
+
 
 class Format(object):
 
     version = 0
 
     fields = (('version', lambda: Format.version),
-              ('obsolete_functions', lambda: []),
+              ('deprecated', lambda: []),
               ('generator', lambda: 'manual'))
 
     generators = {'memestra', 'manual'}
@@ -48,12 +50,12 @@ class Format(object):
                 .format(', '.join(sorted(Format.generators))))
 
     @staticmethod
-    def check_obsolete_functions(data):
-        obsolete_functions = data['obsolete_functions']
-        if not isinstance(obsolete_functions, list):
-            raise ValueError("obsolete_functions must be a list")
-        if not all(isinstance(of, str) for of in obsolete_functions):
-            raise ValueError("obsolete_functions must be a list of string")
+    def check_deprecated(data):
+        deprecated = data['deprecated']
+        if not isinstance(deprecated, list):
+            raise ValueError("deprecated must be a list")
+        if not all(isinstance(of, str) for of in deprecated):
+            raise ValueError("deprecated must be a list of string")
 
 
 class CacheKey(object):
@@ -74,7 +76,7 @@ class Cache(object):
             user_config_dir = xdg_config_home
             memestra_dir = 'memestra'
         self.cachedir = os.path.expanduser(os.path.join(user_config_dir,
-                                                       memestra_dir))
+                                                        memestra_dir))
         os.makedirs(self.cachedir, exist_ok=True)
 
     def _get_path(self, key):
@@ -103,15 +105,33 @@ class Cache(object):
 
 def run_set(args):
     data = {'generator': 'manual',
-            'obsolete_functions': args.deprecated}
+            'deprecated': args.deprecated}
     cache = Cache()
     key = CacheKey(args.input)
     cache[key] = data
+
 
 def run_list(args):
     cache = Cache()
     for k in cache.keys():
         print(k)
+
+
+def run_docparse(args):
+    deprecated = docparse(args.input, args.pattern)
+
+    cache = Cache()
+    key = CacheKey(args.input)
+    data = {'deprecated': deprecated,
+            'generator': 'manual'}
+    cache[key] = data
+    if args.verbose:
+        print("Found {} deprecated identifier{}".format(
+            len(deprecated),
+            's' * bool(deprecated)))
+        for name in deprecated:
+            print(name)
+
 
 def run():
     import argparse
@@ -131,7 +151,17 @@ def run():
     parser_list = subparsers.add_parser('list', help='List cache entries')
     parser_list.set_defaults(runner=run_list)
 
+    parser_docparse = subparsers.add_parser(
+        'docparse',
+        help='Set cache entry from docstring')
+    parser_docparse.add_argument('-v,--verbose', dest='verbose',
+                                 action='store_true')
+    parser_docparse.add_argument(
+        '--pattern', dest='pattern', type=str, default=r'.*deprecated.*',
+        help='pattern found in deprecated function docstring')
+    parser_docparse.add_argument('input', type=str,
+                                 help='module.py to scan')
+    parser_docparse.set_defaults(runner=run_docparse)
+
     args = parser.parse_args()
     args.runner(args)
-
-

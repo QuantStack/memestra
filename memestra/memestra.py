@@ -36,7 +36,7 @@ class ImportResolver(ast.NodeVisitor):
         if module_key in self.cache:
             data = self.cache[module_key]
             if data['version'] == Format.version:
-                return set(data['obsolete_functions'])
+                return set(data['deprecated'])
             elif data['generator'] == 'manual':
                 warnings.warn(
                     ("skipping module {} because it has an obsolete, "
@@ -55,7 +55,7 @@ class ImportResolver(ast.NodeVisitor):
             deprecated = self.collect_deprecated(module, duc, anc)
             dl = {d.name for d in deprecated}
             data = {'generator': 'memestra',
-                    'obsolete_functions': sorted(dl)}
+                    'deprecated': sorted(dl)}
             self.cache[module_key] = data
             return dl
 
