@@ -10,21 +10,27 @@ class Format(object):
     version = 0
 
     fields = (('version', lambda: Format.version),
-              ('deprecated', lambda: []),
+              ('name', str),
+              ('deprecated', list),
               ('generator', lambda: 'manual'))
 
     generators = {'memestra', 'manual'}
 
     @staticmethod
-    def setdefaults(data):
+    def setdefaults(data, **defaults):
         for field, default in Format.fields:
-            data.setdefault(field, default())
+            data.setdefault(field, defaults.get(field, default()))
 
     @staticmethod
     def check(data):
         Format.check_keys(data)
         for k, _ in Format.fields:
             getattr(Format, 'check_{}'.format(k))(data)
+
+    @staticmethod
+    def check_name(data):
+        if not isinstance(data['name'], str):
+            raise ValueError("name must be an str")
 
     @staticmethod
     def check_keys(data):
@@ -61,6 +67,7 @@ class Format(object):
 class CacheKey(object):
 
     def __init__(self, module_path):
+        self.name, _ = os.path.splitext(os.path.basename(module_path))
         with open(module_path, 'rb') as fd:
             self.module_hash = hashlib.sha256(fd.read()).hexdigest()
 
@@ -93,7 +100,7 @@ class Cache(object):
 
     def __setitem__(self, key, data):
         data = data.copy()
-        Format.setdefaults(data)
+        Format.setdefaults(data, name=key.name)
         Format.check(data)
         cache_path = self._get_path(key)
         with open(cache_path, 'w') as yaml_fd:
@@ -101,6 +108,12 @@ class Cache(object):
 
     def keys(self):
         return os.listdir(self.cachedir)
+
+    def items(self):
+        for key in self.keys():
+            cache_path = os.path.join(self.cachedir, key)
+            with open(cache_path, 'r') as yaml_fd:
+                yield key, yaml.load(yaml_fd, Loader=yaml.SafeLoader)
 
 
 def run_set(args):
@@ -113,8 +126,8 @@ def run_set(args):
 
 def run_list(args):
     cache = Cache()
-    for k in cache.keys():
-        print(k)
+    for k, v in cache.items():
+        print('{}: {} ({})'.format(k, v['name'], len(v['deprecated'])))
 
 
 def run_docparse(args):
