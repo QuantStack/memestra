@@ -2,7 +2,9 @@ import beniget
 import sys
 import gast as ast
 import os
+import warnings
 from collections import defaultdict
+from memestra.caching import Cache, CacheKey, Format
 
 
 # FIXME: this only handles module name not subpackages
@@ -20,40 +22,28 @@ class ImportResolver(ast.NodeVisitor):
 
     def __init__(self, decorator):
         self.deprecated = None
-        self.decorator = decorator
+        self.decorator = tuple(decorator)
+        self.cache = Cache()
 
-    def visit_Import(self, node):
-        for alias in node.names:
-            module_path = resolve_module(alias.name)
-
-            if module_path is None:
-                continue
-
-            with open(module_path) as fd:
-                module = ast.parse(fd.read())
-                duc = beniget.DefUseChains()
-                duc.visit(module)
-                anc = beniget.Ancestors()
-                anc.visit(module)
-
-                deprecated = self.collect_deprecated(module, duc, anc)
-                dl = {d.name: d for d in deprecated}
-                for user in self.def_use_chains.chains[alias].users():
-                    parent = self.ancestors.parents(user.node)[-1]
-                    if isinstance(parent, ast.Attribute):
-                        if parent.attr in dl:
-                            self.deprecated.add(parent)
-
-    # FIXME: handle relative imports
-    def visit_ImportFrom(self, node):
-        if node.module is None:
-            return
-        module_path = resolve_module(node.module)
+    def load_deprecated_from_module(self, module_name):
+        module_path = resolve_module(module_name)
 
         if module_path is None:
-            return
+            return None
 
-        aliases = [alias.name for alias in node.names]
+        module_key = CacheKey(module_path)
+
+        if module_key in self.cache:
+            data = self.cache[module_key]
+            if data['version'] == Format.version:
+                return set(data['deprecated'])
+            elif data['generator'] == 'manual':
+                warnings.warn(
+                    ("skipping module {} because it has an obsolete, "
+                     "manually generated, cache file: {}")
+                    .format(module_name,
+                            module_key.module_hash))
+                return []
 
         with open(module_path) as fd:
             module = ast.parse(fd.read())
@@ -61,14 +51,42 @@ class ImportResolver(ast.NodeVisitor):
             duc.visit(module)
             anc = beniget.Ancestors()
             anc.visit(module)
-            for deprecated in self.collect_deprecated(module, duc, anc):
-                try:
-                    index = aliases.index(deprecated.name)
-                    alias = node.names[index]
-                    for user in self.def_use_chains.chains[alias].users():
-                        self.deprecated.add(user.node)
-                except ValueError:
-                    continue
+
+            deprecated = self.collect_deprecated(module, duc, anc)
+            dl = {d.name for d in deprecated}
+            data = {'generator': 'memestra',
+                    'deprecated': sorted(dl)}
+            self.cache[module_key] = data
+            return dl
+
+    def visit_Import(self, node):
+        for alias in node.names:
+            deprecated = self.load_deprecated_from_module(alias.name)
+            if deprecated is None:
+                continue
+
+            for user in self.def_use_chains.chains[alias].users():
+                parent = self.ancestors.parents(user.node)[-1]
+                if isinstance(parent, ast.Attribute):
+                    if parent.attr in deprecated:
+                        self.deprecated.add(parent)
+
+    # FIXME: handle relative imports
+    def visit_ImportFrom(self, node):
+        deprecated = self.load_deprecated_from_module(node.module)
+        if deprecated is None:
+            return
+
+        aliases = [alias.name for alias in node.names]
+
+        for deprec in deprecated:
+            try:
+                index = aliases.index(deprec)
+                alias = node.names[index]
+                for user in self.def_use_chains.chains[alias].users():
+                    self.deprecated.add(user.node)
+            except ValueError:
+                continue
 
     def visit_Module(self, node):
         duc = beniget.DefUseChains()
