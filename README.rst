@@ -1,7 +1,7 @@
 Memestra!
 =========
 
-Memestra is a deprecated function usage checker.
+Memestra checks code for places where deprecated functions are called.
 
 Judging by the code layout, you'd guess it's in early alpha :-)
 
