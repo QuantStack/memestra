@@ -17,7 +17,6 @@ def resolve_module(module_name):
     return
 
 
-# FIXME: this is not recursive, but should be
 class ImportResolver(ast.NodeVisitor):
 
     def __init__(self, decorator):
@@ -57,6 +56,8 @@ class ImportResolver(ast.NodeVisitor):
             data = {'generator': 'memestra',
                     'deprecated': sorted(dl)}
             self.cache[module_key] = data
+            # visit modules recursively
+            self.generic_visit(module)
             return dl
 
     def visit_Import(self, node):
@@ -65,11 +66,16 @@ class ImportResolver(ast.NodeVisitor):
             if deprecated is None:
                 continue
 
-            for user in self.def_use_chains.chains[alias].users():
-                parent = self.ancestors.parents(user.node)[-1]
-                if isinstance(parent, ast.Attribute):
-                    if parent.attr in deprecated:
-                        self.deprecated.add(parent)
+            # the functools python module doesn't have a
+            # self.def_use_chains.chains[alias] and will cause memestra to crash
+            try:
+                for user in self.def_use_chains.chains[alias].users():
+                    parent = self.ancestors.parents(user.node)[-1]
+                    if isinstance(parent, ast.Attribute):
+                        if parent.attr in deprecated:
+                            self.deprecated.add(parent)
+            except:
+                continue
 
     # FIXME: handle relative imports
     def visit_ImportFrom(self, node):
