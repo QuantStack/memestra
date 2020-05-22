@@ -14,7 +14,9 @@ class NotebookTest(TestCase):
     def test_nb_demo(self):
         output = nbmemestra.nbmemestra(os.path.join(this_dir, 'misc',
                                        'memestra_nb_demo.ipynb'),
-                                       ('decoratortest', 'deprecated'))
+                                       ('decoratortest', 'deprecated'),
+                                       os.path.join(this_dir, 'misc',
+                                       'memestra_nb_demo.ipynb'))
         expected_output = [('some_module.foo', 'Cell[0]', 2, 0),
                            ('some_module.foo', 'Cell[0]', 3, 0),
                            ('some_module.foo', 'Cell[2]', 2, 4)]

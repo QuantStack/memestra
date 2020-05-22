@@ -1,34 +1,39 @@
 import beniget
-import sys
 import gast as ast
 import os
+import sys
 import warnings
+
 from collections import defaultdict
+from itertools import chain
 from memestra.caching import Cache, CacheKey, Format
 
 _defs = ast.AsyncFunctionDef, ast.ClassDef, ast.FunctionDef
 
 
 # FIXME: this only handles module name not subpackages
-def resolve_module(module_name):
+def resolve_module(module_name, importer_path=()):
     module_path = module_name + ".py"
-    for base in sys.path:
+    bases = sys.path
+    if importer_path:
+        bases = chain(os.path.abspath(
+            os.path.dirname(importer_path)), sys.path)
+    for base in bases:
         fullpath = os.path.join(base, module_path)
         if os.path.exists(fullpath):
             return fullpath
     return
 
-
 # FIXME: this is not recursive, but should be
 class ImportResolver(ast.NodeVisitor):
-
-    def __init__(self, decorator):
+    def __init__(self, decorator, file_path=None):
         self.deprecated = None
         self.decorator = tuple(decorator)
         self.cache = Cache()
+        self.file_path = file_path
 
     def load_deprecated_from_module(self, module_name):
-        module_path = resolve_module(module_name)
+        module_path = resolve_module(module_name, self.file_path)
 
         if module_path is None:
             return None
@@ -161,7 +166,7 @@ def prettyname(node):
     return repr(node)
 
 
-def memestra(file_descriptor, decorator):
+def memestra(file_descriptor, decorator, file_path=None):
     '''
     Parse `file_descriptor` and returns a list of
     (function, filename, line, colno) tuples. Each elements
@@ -177,7 +182,7 @@ def memestra(file_descriptor, decorator):
     module = ast.parse(file_descriptor.read())
 
     # Collect deprecated functions
-    resolver = ImportResolver(decorator)
+    resolver = ImportResolver(decorator, file_path)
     resolver.visit(module)
 
     ancestors = resolver.ancestors
@@ -223,7 +228,8 @@ def run():
     _, extension = os.path.splitext(args.input.name)
 
     deprecate_uses = dispatcher[extension](args.input,
-                                           args.decorator.split('.'))
+                                           args.decorator.split('.'),
+                                           args.input.name)
 
     for fname, fd, lineno, colno in deprecate_uses:
         print("{} used at {}:{}:{}".format(fname, fd, lineno, colno + 1))

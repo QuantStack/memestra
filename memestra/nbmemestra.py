@@ -4,7 +4,7 @@ from collections import namedtuple
 import nbformat
 
 
-def nbmemestra_from_nbnode(nb, decorator):
+def nbmemestra_from_nbnode(nb, decorator, filepath):
     # Get code cells
     cells = nb.cells
     code_cells = [c for c in cells if c['cell_type'] == 'code']
@@ -22,7 +22,7 @@ def nbmemestra_from_nbnode(nb, decorator):
     code = '\n'.join(code_list)
 
     # Collect calls to deprecated functions
-    deprecated_list = memestra(StringIO(code), decorator)
+    deprecated_list = memestra(StringIO(code), decorator, filepath)
 
     # Map them to cells
     result = []
@@ -35,9 +35,9 @@ def nbmemestra_from_nbnode(nb, decorator):
     return result
 
 
-def nbmemestra(nbfile, decorator):
+def nbmemestra(nbfile, decorator, filepath):
     nb = nbformat.read(nbfile, 4)
-    return nbmemestra_from_nbnode(nb, decorator)
+    return nbmemestra_from_nbnode(nb, decorator, filepath)
 
 
 def register(dispatcher):
