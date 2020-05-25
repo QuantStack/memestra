@@ -2,6 +2,9 @@ from setuptools import setup
 
 kw = {"test_suite": "tests"}
 
+dev_reqs = open("requirements-dev.txt").read().splitlines()
+extras_require = {"test": dev_reqs, "dev": dev_reqs}
+
 setup(
     name="memestra",
     version="0.0.1",
@@ -17,6 +20,7 @@ with a given decorator.""",
     url="https://github.com/QuantStack/memestra",
     license="BSD 3-Clause",
     install_requires=open("requirements.txt").read().splitlines(),
+    extras_require=extras_require,
     entry_points={'console_scripts':
                   ['memestra = memestra.memestra:run',
                    'memestra-cache = memestra.caching:run'],
