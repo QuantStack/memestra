@@ -10,7 +10,8 @@ Sample Usages
 
 Track usage of functions decorated by ``@decorator.deprecated``:
 
-.. code-block:: sh
+.. code-block:: console
+
     > cat test.py
     import decorator
 
@@ -29,7 +30,8 @@ Track usage of functions decorated by ``@decorator.deprecated``:
 Track usage of functions decorated by ``deprecated`` imported from
 ``decorator``:
 
-.. code-block:: sh
+.. code-block:: console
+
     > cat test2.py
     from decorator import deprecated
 
@@ -48,7 +50,8 @@ Track usage of functions decorated by ``deprecated`` imported from
 Track usage of functions decorated by ``deprecated`` imported from
 ``decorator`` and aliased:
 
-.. code-block:: sh
+.. code-block:: console
+
     > cat test3.py
     from decorator import deprecated as dp
 
