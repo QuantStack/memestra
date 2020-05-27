@@ -171,7 +171,8 @@ def memestra(file_descriptor, decorator):
     e.g. (module, attribute)
     '''
 
-    assert len(decorator) > 1, "decorator is at least (module, attribute)"
+    assert not isinstance(decorator, str) and \
+           len(decorator) > 1, "decorator is at least (module, attribute)"
 
     module = ast.parse(file_descriptor.read())
 
