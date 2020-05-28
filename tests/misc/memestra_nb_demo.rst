@@ -7,6 +7,12 @@
 
 .. parsed-literal::
 
+    warning: foo has been deprecated
+    warning: foo has been deprecated
+
+
+.. parsed-literal::
+
     On line 2:
     some_module.foo()
     ^
@@ -36,7 +42,13 @@ some text
 
 .. parsed-literal::
 
+    warning: foo has been deprecated
+
+
+.. parsed-literal::
+
     On line 2:
         some_module.foo()
         ^
     Warning: call to deprecated function some_module.foo
+

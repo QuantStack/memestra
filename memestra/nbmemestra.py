@@ -4,11 +4,7 @@ from collections import namedtuple
 import nbformat
 
 
-def nbmemestra(nb_or_file, decorator):
-    if isinstance(nb_or_file, nbformat.NotebookNode):
-        nb = nb_or_file
-    else:
-        nb = nbformat.read(nb_or_file, 4)
+def nbmemestra_from_nbnode(nb, decorator):
     # Get code cells
     cells = nb.cells
     code_cells = [c for c in cells if c['cell_type'] == 'code']
@@ -37,6 +33,11 @@ def nbmemestra(nb_or_file, decorator):
                        d[3]))
 
     return result
+
+
+def nbmemestra(nbfile, decorator):
+    nb = nbformat.read(nbfile, 4)
+    return nbmemestra_from_nbnode(nb, decorator)
 
 
 def register(dispatcher):
