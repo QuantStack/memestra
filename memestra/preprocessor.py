@@ -18,24 +18,26 @@ class MemestraDeprecationChecker(Preprocessor):
             deprecation.append(d)
             deprecations[code_cell_i] = deprecation
         # filter out non-code cell as it is done in nbmemestra
-        code_cell_i = 0
+        code_cell_i = -1
         for cell in nb.cells:
-            if cell['cell_type'] == 'code':
-                if code_cell_i in deprecations:
-                    for d in deprecations[code_cell_i]:
-                        line, col = d[2:4]
-                        outputs = cell.get('outputs', [])
-                        message = ('On line {}:\n'
-                                   '{}\n'
-                                   '{}^\n'
-                                   'Warning: call to deprecated function {}'.format(
-                                       line,
-                                       cell['source'].split('\n')[line - 1],
-                                       ' ' * col,
-                                       d[0]
-                                  ))
+            if cell['cell_type'] != 'code':
+                continue
+            code_cell_i += 1
+            if code_cell_i not in deprecations:
+                continue
+            for d in deprecations[code_cell_i]:
+                line, col = d[2:4]
+                outputs = cell.get('outputs', [])
+                message = ('On line {}:\n'
+                           '{}\n'
+                           '{}^\n'
+                           'Warning: call to deprecated function {}'.format(
+                               line,
+                               cell['source'].split('\n')[line - 1],
+                               ' ' * col,
+                               d[0]
+                          ))
 
-                        outputs.append({'output_type': 'stream', 'name': 'stderr', 'text': message})
-                        cell['outputs'] = outputs
-                code_cell_i += 1
+                outputs.append({'output_type': 'stream', 'name': 'stderr', 'text': message})
+                cell['outputs'] = outputs
         return nb, resources
