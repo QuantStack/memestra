@@ -38,7 +38,7 @@ class TestCaching(TestCase):
             cache[key] = {}
             data = cache[key]
             self.assertEqual(data['version'], memestra.caching.Format.version)
-            self.assertEqual(data['name'], 'caching')
+            self.assertEqual(data['name'], 'test_caching')
             self.assertEqual(data['deprecated'], [])
             self.assertEqual(data['generator'], 'manual')
         finally:

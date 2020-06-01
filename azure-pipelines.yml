@@ -26,5 +26,6 @@ jobs:
         displayName: Install Anaconda packages
       - script: |
           call activate test-environment
-          python setup.py test
-        displayName: Run tests
+          pip install -v .[test]
+          pytest -v
+        displayName: Build and run tests
