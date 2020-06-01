@@ -23,8 +23,9 @@ jobs:
       - script: |
           call activate test-environment
           conda install --yes --quiet -c conda-forge pandoc pip
+          pip install -v .[test]
         displayName: Install Anaconda packages
       - script: |
           call activate test-environment
-          python setup.py test
+          pytest -v
         displayName: Run tests
