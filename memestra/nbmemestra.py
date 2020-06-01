@@ -4,9 +4,9 @@ from collections import namedtuple
 import nbformat
 
 
-def nbmemestra(nbfile, decorator):
+def nbmemestra_from_nbnode(nb, decorator):
     # Get code cells
-    cells = nbformat.read(nbfile, 4).cells
+    cells = nb.cells
     code_cells = [c for c in cells if c['cell_type'] == 'code']
     Cell = namedtuple('Cell', 'id begin end')
     # Aggregate code cells and generate cells list
@@ -33,6 +33,11 @@ def nbmemestra(nbfile, decorator):
                        d[3]))
 
     return result
+
+
+def nbmemestra(nbfile, decorator):
+    nb = nbformat.read(nbfile, 4)
+    return nbmemestra_from_nbnode(nb, decorator)
 
 
 def register(dispatcher):
