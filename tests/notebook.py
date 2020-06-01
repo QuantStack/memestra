@@ -30,7 +30,13 @@ class NotebookTest(TestCase):
 
         deprecation_checker = RSTExporter(config=c)
 
+        # the RST exporter behaves differently on windows and on linux
+        # there can be some lines with only whitespaces
+        # so we ignore differences that only consist of empty lines
         rst = deprecation_checker.from_notebook_node(notebook)[0]
+        lines = rst.split('\n')
+        lines = [l.rstrip() for l in lines]
+        rst = '\n'.join(lines)
 
         with open(os.path.join(this_dir, 'misc', 'memestra_nb_demo.rst')) as f:
             rst_true = f.read()
