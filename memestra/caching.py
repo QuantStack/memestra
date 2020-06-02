@@ -115,6 +115,14 @@ class Cache(object):
             with open(cache_path, 'r') as yaml_fd:
                 yield key, yaml.load(yaml_fd, Loader=yaml.SafeLoader)
 
+    def clear(self):
+        count = 0
+        for key in self.keys():
+            cache_path = os.path.join(self.cachedir, key)
+            os.remove(cache_path)
+            count += 1
+        return count
+
 
 def run_set(args):
     data = {'generator': 'manual',
@@ -128,6 +136,13 @@ def run_list(args):
     cache = Cache()
     for k, v in cache.items():
         print('{}: {} ({})'.format(k, v['name'], len(v['deprecated'])))
+
+
+def run_clear(args):
+    cache = Cache()
+    nb_cleared = cache.clear()
+    print('Cache cleared, {} element{} removed.'.format(nb_cleared, 's' *
+                                                        (nb_cleared > 1)))
 
 
 def run_docparse(args):
@@ -163,6 +178,10 @@ def run():
 
     parser_list = subparsers.add_parser('list', help='List cache entries')
     parser_list.set_defaults(runner=run_list)
+
+    parser_clear = subparsers.add_parser('clear',
+                                         help='Remove all cache entries')
+    parser_clear.set_defaults(runner=run_clear)
 
     parser_docparse = subparsers.add_parser(
         'docparse',
