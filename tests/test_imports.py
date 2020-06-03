@@ -69,3 +69,52 @@ class TestImports(TestCase):
         self.checkDeprecatedUses(
             code,
             [('Module.foo', '<>', 5, 4), ('Module.foo', '<>', 8, 0)])
+
+class TestRecImports(TestCase):
+
+    def checkDeprecatedUses(self, code, expected_output):
+        sio = StringIO(dedent(code))
+        output = memestra.memestra(sio, ('decoratortest', 'deprecated'),
+                                   recursive=True)
+        self.assertEqual(output, expected_output)
+
+    def test_import(self):
+        code = '''
+            import some_rec_module
+
+            def foobar():
+                some_rec_module.foo()
+                some_rec_module.bar()
+
+            some_rec_module.foo()'''
+
+        self.checkDeprecatedUses(
+            code,
+            [('some_rec_module.foo', '<>', 5, 4),
+             ('some_rec_module.foo', '<>', 8, 0)])
+
+    def test_import_from0(self):
+        code = '''
+            from some_rec_module import foo
+
+            def foobar():
+                foo()
+
+            foo()'''
+
+        self.checkDeprecatedUses(
+            code,
+            [('foo', '<>', 5, 4), ('foo', '<>', 7, 0)])
+
+    def test_import_from1(self):
+        code = '''
+            from some_rec_module import bar
+
+            def foobar():
+                bar()
+
+            bar()'''
+
+        self.checkDeprecatedUses(
+            code,
+            [])
