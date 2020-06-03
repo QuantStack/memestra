@@ -177,4 +177,7 @@ def run():
     parser_docparse.set_defaults(runner=run_docparse)
 
     args = parser.parse_args()
-    args.runner(args)
+    if hasattr(args, 'runner'):
+        args.runner(args)
+    else:
+        parser.print_help()
