@@ -1,13 +1,33 @@
 import os
 import hashlib
 import yaml
+import gast as ast
 
 from memestra.docparse import docparse
+from memestra.utils import resolve_module
+
+
+class DependenciesResolver(ast.NodeVisitor):
+
+    def __init__(self):
+        self.result = set()
+
+    def add_module(self, module_name):
+        module_path = resolve_module(module_name)
+        if module_path is not None:
+            self.result.add(module_path)
+
+    def visit_Import(self, node):
+        for alias in node.names:
+            self.add_module(alias.name)
+
+    def visit_ImportFrom(self, node):
+        self.add_module(node.module)
 
 
 class Format(object):
 
-    version = 0
+    version = 1
 
     fields = (('version', lambda: Format.version),
               ('name', str),
@@ -64,12 +84,71 @@ class Format(object):
             raise ValueError("deprecated must be a list of string")
 
 
-class CacheKey(object):
+class CacheKeyFactoryBase(object):
+    def __init__(self, keycls):
+        self.keycls = keycls
+        self.created = dict()
 
-    def __init__(self, module_path):
-        self.name, _ = os.path.splitext(os.path.basename(module_path))
-        with open(module_path, 'rb') as fd:
-            self.module_hash = hashlib.sha256(fd.read()).hexdigest()
+    def __call__(self, module_path):
+        if module_path in self.created:
+            return self.created[module_path]
+        else:
+            self.created[module_path] = None  # creation in process
+            key = self.keycls(module_path, self)
+            self.created[module_path] = key
+            return key
+
+    def __iter__(self):
+        return iter(self.created.keys())
+
+
+class CacheKeyFactory(CacheKeyFactoryBase):
+
+    class CacheKey(object):
+
+        def __init__(self, module_path, _):
+            self.name, _ = os.path.splitext(os.path.basename(module_path))
+            with open(module_path, 'rb') as fd:
+                module_content = fd.read()
+                module_hash = hashlib.sha256(module_content).hexdigest()
+                self.module_hash = module_hash
+
+    def __init__(self):
+        super(CacheKeyFactory, self).__init__(CacheKeyFactory.CacheKey)
+
+
+class RecursiveCacheKeyFactory(CacheKeyFactoryBase):
+
+    class CacheKey(object):
+
+        def __init__(self, module_path, factory):
+            assert module_path not in factory.created or factory.created[module_path] is None
+
+            self.name, _ = os.path.splitext(os.path.basename(module_path))
+            with open(module_path, 'rb') as fd:
+                module_content = fd.read()
+
+                code = ast.parse(module_content)
+                dependencies_resolver = DependenciesResolver()
+                dependencies_resolver.visit(code)
+
+                new_deps = dependencies_resolver.result.difference(factory)
+
+                module_hash = hashlib.sha256(module_content).hexdigest()
+
+                def bytes_xor(left, right):
+                    return str(chr(ord(l) ^ ord(r))
+                               for l, r in zip(left, right))
+
+                for new_dep in sorted(new_deps):
+                    new_dep_key = factory(new_dep)
+                    module_hash = bytes_xor(module_hash,
+                                            new_dep_key.module_hash)
+
+                self.module_hash = module_hash
+
+    def __init__(self):
+        super(RecursiveCacheKeyFactory, self).__init__(RecursiveCacheKeyFactory.CacheKey)
 
 
 class Cache(object):
@@ -128,7 +207,11 @@ def run_set(args):
     data = {'generator': 'manual',
             'deprecated': args.deprecated}
     cache = Cache()
-    key = CacheKey(args.input)
+    if args.recursive:
+        key_factory = RecursiveCacheKeyFactory()
+    else:
+        key_factory = CacheKeyFactory()
+    key = key_factory(args.input)
     cache[key] = data
 
 
@@ -172,6 +255,8 @@ def run():
                             type=str, nargs='+',
                             default='decorator.deprecated',
                             help='function to flag as deprecated')
+    parser_set.add_argument('--recursive', action='store_true',
+                            help='compute a dependency-aware cache key')
     parser_set.add_argument('input', type=str,
                             help='module.py to edit')
     parser_set.set_defaults(runner=run_set)

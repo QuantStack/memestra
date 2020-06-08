@@ -5,24 +5,11 @@ import sys
 import warnings
 
 from collections import defaultdict
-from itertools import chain
-from memestra.caching import Cache, CacheKey, Format
+from memestra.caching import Cache, CacheKeyFactory, RecursiveCacheKeyFactory
+from memestra.caching import Format
+from memestra.utils import resolve_module
 
 _defs = ast.AsyncFunctionDef, ast.ClassDef, ast.FunctionDef
-
-
-# FIXME: this only handles module name not subpackages
-def resolve_module(module_name, importer_path=()):
-    module_path = module_name + ".py"
-    bases = sys.path
-    if importer_path:
-        bases = chain(os.path.abspath(
-            os.path.dirname(importer_path)), sys.path)
-    for base in bases:
-        fullpath = os.path.join(base, module_path)
-        if os.path.exists(fullpath):
-            return fullpath
-    return
 
 
 class SilentDefUseChains(beniget.DefUseChains):
@@ -33,14 +20,14 @@ class SilentDefUseChains(beniget.DefUseChains):
 
 class ImportResolver(ast.NodeVisitor):
 
-    def __init__(self, decorator, file_path=None, recursion_depth=0, parent=None):
+    def __init__(self, decorator, file_path=None, recursive=False, parent=None):
         '''
         Create an ImportResolver that finds deprecated identifiers.
 
         A deprecated identifier is an identifier which is decorated
         by `decorator', or which uses a deprecated identifier.
 
-        if `recursion_depth' is greater than 0, it considers identifiers
+        if `recursive' is greater than 0, it considers identifiers
         from imported module, with that depth in the import tree.
 
         `parent' is used internally to handle imports.
@@ -48,13 +35,18 @@ class ImportResolver(ast.NodeVisitor):
         self.deprecated = None
         self.decorator = tuple(decorator)
         self.file_path = file_path
-        self.recursion_depth = recursion_depth
+        self.recursive = recursive
         if parent:
             self.cache = parent.cache
             self.visited = parent.visited
+            self.key_factory = parent.key_factory
         else:
             self.cache = Cache()
             self.visited = set()
+            if recursive:
+                self.key_factory = RecursiveCacheKeyFactory()
+            else:
+                self.key_factory = CacheKeyFactory()
 
     def load_deprecated_from_module(self, module_name):
         module_path = resolve_module(module_name, self.file_path)
@@ -62,7 +54,7 @@ class ImportResolver(ast.NodeVisitor):
         if module_path is None:
             return None
 
-        module_key = CacheKey(module_path)
+        module_key = self.key_factory(module_path)
 
         if module_key in self.cache:
             data = self.cache[module_key]
@@ -84,10 +76,11 @@ class ImportResolver(ast.NodeVisitor):
             anc.visit(module)
 
             # Collect deprecated functions
-            if self.recursion_depth != 0 and module_path not in self.visited:
+            if self.recursive and module_path not in self.visited:
                 self.visited.add(module_path)
                 resolver = ImportResolver(self.decorator,
-                                          self.recursion_depth - 1,
+                                          self.file_path,
+                                          self.recursive,
                                           parent=self)
                 resolver.visit(module)
                 deprecated_imports = [d for _, _, d in
@@ -235,8 +228,7 @@ def memestra(file_descriptor, decorator, file_path=None, recursive=False):
 
     module = ast.parse(file_descriptor.read())
     # Collect deprecated functions
-    resolver = ImportResolver(decorator, file_path,
-                              recursion_depth=-1 if recursive else 0)
+    resolver = ImportResolver(decorator, file_path, recursive)
     resolver.visit(module)
 
     ancestors = resolver.ancestors
@@ -264,8 +256,8 @@ def run():
                         default='decorator.deprecated',
                         help='Path to the decorator to check')
     parser.add_argument('--recursive', dest='recursive',
-                        default='store_false',
-                        help='Path to the decorator to check')
+                        action='store_true',
+                        help='Traverse the whole module hierarchy')
     parser.add_argument('input', type=argparse.FileType('r'),
                         help='file to scan')
 
