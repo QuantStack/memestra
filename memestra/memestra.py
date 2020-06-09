@@ -24,6 +24,13 @@ def resolve_module(module_name, importer_path=()):
             return fullpath
     return
 
+
+class SilentDefUseChains(beniget.DefUseChains):
+
+    def unbound_identifier(self, name, node):
+        pass
+
+
 # FIXME: this is not recursive, but should be
 class ImportResolver(ast.NodeVisitor):
     def __init__(self, decorator, file_path=None):
@@ -54,7 +61,7 @@ class ImportResolver(ast.NodeVisitor):
 
         with open(module_path) as fd:
             module = ast.parse(fd.read())
-            duc = beniget.DefUseChains()
+            duc = SilentDefUseChains()
             duc.visit(module)
             anc = beniget.Ancestors()
             anc.visit(module)
@@ -96,7 +103,7 @@ class ImportResolver(ast.NodeVisitor):
                 continue
 
     def visit_Module(self, node):
-        duc = beniget.DefUseChains()
+        duc = SilentDefUseChains()
         duc.visit(node)
         self.def_use_chains = duc
 
