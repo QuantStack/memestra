@@ -12,7 +12,7 @@ class MemestraDeprecationChecker(Preprocessor):
     def preprocess(self, nb, resources):
         self.log.info("Using decorator '%s.%s' to check deprecated functions", self.decorator[0], self.decorator[1])
         deprecations = {}
-        for d in nbmemestra.nbmemestra_from_nbnode(nb, self.decorator):
+        for d in nbmemestra.nbmemestra_from_nbnode(nb, self.decorator, ""):
             code_cell_i = int(re.search(r"\[(\d+)\]", d[1]).group(1))
             deprecation = deprecations.get(code_cell_i, [])
             deprecation.append(d)
