@@ -1,13 +1,20 @@
 import os
 import hashlib
 import yaml
-import gast as ast
+
+# not using gast because we only rely on Import and ImportFrom, which are
+# portable. Not using gast prevents an extra costly conversion step.
+import ast
 
 from memestra.docparse import docparse
 from memestra.utils import resolve_module
 
 
 class DependenciesResolver(ast.NodeVisitor):
+    '''
+    Traverse a module an collect statically imported modules
+    '''
+
 
     def __init__(self):
         self.result = set()
@@ -23,6 +30,41 @@ class DependenciesResolver(ast.NodeVisitor):
 
     def visit_ImportFrom(self, node):
         self.add_module(node.module)
+
+    # All members below are specialized in order to improve performance:
+    # It's useless to traverse leaf statements and expression when looking for
+    # an import.
+
+    def visit_stmt(self, node):
+        pass
+
+    visit_Assign = visit_AugAssign = visit_AnnAssign = visit_Expr = visit_stmt
+    visit_Return = visit_Print = visit_Raise = visit_Assert = visit_stmt
+    visit_Pass = visit_Break = visit_Continue = visit_Delete = visit_stmt
+    visit_Global = visit_Nonlocal = visit_Exec = visit_stmt
+
+    def visit_body(self, node):
+        for stmt in node.body:
+            self.visit(stmt)
+
+    visit_FunctionDef = visit_ClassDef = visit_AsyncFunctionDef = visit_body
+    visit_With = visit_AsyncWith = visit_body
+
+    def visit_orelse(self, node):
+        for stmt in node.body:
+            self.visit(stmt)
+        for stmt in node.orelse:
+            self.visit(stmt)
+
+    visit_For = visit_While = visit_If = visit_AsyncFor = visit_orelse
+
+    def visit_Try(self, node):
+        for stmt in node.body:
+            self.visit(stmt)
+        for stmt in node.orelse:
+            self.visit(stmt)
+        for stmt in node.finalbody:
+            self.visit(stmt)
 
 
 class Format(object):
@@ -98,11 +140,15 @@ class CacheKeyFactoryBase(object):
             self.created[module_path] = key
             return key
 
-    def __iter__(self):
-        return iter(self.created.keys())
+    def get(self, *args):
+        return self.created.get(*args)
 
 
 class CacheKeyFactory(CacheKeyFactoryBase):
+    '''
+    Factory for non-recursive keys.
+    Only the content of the module is taken into account
+    '''
 
     class CacheKey(object):
 
@@ -118,6 +164,12 @@ class CacheKeyFactory(CacheKeyFactoryBase):
 
 
 class RecursiveCacheKeyFactory(CacheKeyFactoryBase):
+    '''
+    Factory for recursive keys.
+    This take into account the module content, and the content of *all* imported
+    module. That way, a change in the module hierarchy implies a change in the
+    key.
+    '''
 
     class CacheKey(object):
 
@@ -132,20 +184,20 @@ class RecursiveCacheKeyFactory(CacheKeyFactoryBase):
                 dependencies_resolver = DependenciesResolver()
                 dependencies_resolver.visit(code)
 
-                new_deps = dependencies_resolver.result.difference(factory)
+                new_deps = []
+                for dep in dependencies_resolver.result:
+                    if factory.get(dep, 1) is not None:
+                        new_deps.append(dep)
 
                 module_hash = hashlib.sha256(module_content).hexdigest()
 
-                def bytes_xor(left, right):
-                    return str(chr(ord(l) ^ ord(r))
-                               for l, r in zip(left, right))
+                hashes = [module_hash]
 
                 for new_dep in sorted(new_deps):
                     new_dep_key = factory(new_dep)
-                    module_hash = bytes_xor(module_hash,
-                                            new_dep_key.module_hash)
+                    hashes.append(new_dep_key.module_hash)
 
-                self.module_hash = module_hash
+                self.module_hash = hashlib.sha256("".join(hashes).encode("ascii")).hexdigest()
 
     def __init__(self):
         super(RecursiveCacheKeyFactory, self).__init__(RecursiveCacheKeyFactory.CacheKey)
