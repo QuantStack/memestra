@@ -90,6 +90,7 @@ class ImportResolver(ast.NodeVisitor):
             deprecated = self.collect_deprecated(module, duc, anc)
             deprecated.update(deprecated_imports)
             dl = {d.name for d in deprecated}
+            dl = {d.name for d in deprecated}
             data = {'generator': 'memestra',
                     'deprecated': sorted(dl)}
             self.cache[module_key] = data
@@ -106,7 +107,7 @@ class ImportResolver(ast.NodeVisitor):
                     continue
                 deprecated_uses.append((deprecated_node, user,
                                         user_ancestors[-1] if user_ancestors
-                                        else None))
+                                        else user.node))
         return deprecated_uses
 
     def visit_Import(self, node):
