@@ -194,7 +194,12 @@ class RecursiveCacheKeyFactory(CacheKeyFactoryBase):
                 hashes = [module_hash]
 
                 for new_dep in sorted(new_deps):
-                    new_dep_key = factory(new_dep)
+                    try:
+                        new_dep_key = factory(new_dep)
+                    # FIXME: this only happens on windows, maybe we could do
+                    # better?
+                    except UnicodeDecodeError:
+                        continue
                     hashes.append(new_dep_key.module_hash)
 
                 self.module_hash = hashlib.sha256("".join(hashes).encode("ascii")).hexdigest()

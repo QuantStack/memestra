@@ -69,7 +69,10 @@ class ImportResolver(ast.NodeVisitor):
                 return []
 
         with open(module_path) as fd:
-            module = ast.parse(fd.read())
+            try:
+                module = ast.parse(fd.read())
+            except UnicodeDecodeError:
+                return []
             duc = SilentDefUseChains()
             duc.visit(module)
             anc = beniget.Ancestors()
