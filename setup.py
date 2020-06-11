@@ -28,7 +28,7 @@ with a given decorator.""",
                   [".ipynb = memestra.nbmemestra:register", ],
                   },
     classifiers=[
-        "Development Status :: 5 - Alpha",
+        "Development Status :: 3 - Alpha",
         "Environment :: Console",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: BSD License",
