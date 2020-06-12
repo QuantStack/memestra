@@ -5,24 +5,11 @@ import sys
 import warnings
 
 from collections import defaultdict
-from itertools import chain
-from memestra.caching import Cache, CacheKey, Format
+from memestra.caching import Cache, CacheKeyFactory, RecursiveCacheKeyFactory
+from memestra.caching import Format
+from memestra.utils import resolve_module
 
 _defs = ast.AsyncFunctionDef, ast.ClassDef, ast.FunctionDef
-
-
-# FIXME: this only handles module name not subpackages
-def resolve_module(module_name, importer_path=()):
-    module_path = module_name + ".py"
-    bases = sys.path
-    if importer_path:
-        bases = chain(os.path.abspath(
-            os.path.dirname(importer_path)), sys.path)
-    for base in bases:
-        fullpath = os.path.join(base, module_path)
-        if os.path.exists(fullpath):
-            return fullpath
-    return
 
 
 class SilentDefUseChains(beniget.DefUseChains):
@@ -31,13 +18,35 @@ class SilentDefUseChains(beniget.DefUseChains):
         pass
 
 
-# FIXME: this is not recursive, but should be
 class ImportResolver(ast.NodeVisitor):
-    def __init__(self, decorator, file_path=None):
+
+    def __init__(self, decorator, file_path=None, recursive=False, parent=None):
+        '''
+        Create an ImportResolver that finds deprecated identifiers.
+
+        A deprecated identifier is an identifier which is decorated
+        by `decorator', or which uses a deprecated identifier.
+
+        if `recursive' is greater than 0, it considers identifiers
+        from imported module, with that depth in the import tree.
+
+        `parent' is used internally to handle imports.
+        '''
         self.deprecated = None
         self.decorator = tuple(decorator)
-        self.cache = Cache()
         self.file_path = file_path
+        self.recursive = recursive
+        if parent:
+            self.cache = parent.cache
+            self.visited = parent.visited
+            self.key_factory = parent.key_factory
+        else:
+            self.cache = Cache()
+            self.visited = set()
+            if recursive:
+                self.key_factory = RecursiveCacheKeyFactory()
+            else:
+                self.key_factory = CacheKeyFactory()
 
     def load_deprecated_from_module(self, module_name):
         module_path = resolve_module(module_name, self.file_path)
@@ -45,7 +54,7 @@ class ImportResolver(ast.NodeVisitor):
         if module_path is None:
             return None
 
-        module_key = CacheKey(module_path)
+        module_key = self.key_factory(module_path)
 
         if module_key in self.cache:
             data = self.cache[module_key]
@@ -60,18 +69,49 @@ class ImportResolver(ast.NodeVisitor):
                 return []
 
         with open(module_path) as fd:
-            module = ast.parse(fd.read())
+            try:
+                module = ast.parse(fd.read())
+            except UnicodeDecodeError:
+                return []
             duc = SilentDefUseChains()
             duc.visit(module)
             anc = beniget.Ancestors()
             anc.visit(module)
 
+            # Collect deprecated functions
+            if self.recursive and module_path not in self.visited:
+                self.visited.add(module_path)
+                resolver = ImportResolver(self.decorator,
+                                          self.file_path,
+                                          self.recursive,
+                                          parent=self)
+                resolver.visit(module)
+                deprecated_imports = [d for _, _, d in
+                                      resolver.get_deprecated_users(duc, anc)]
+            else:
+                deprecated_imports = []
             deprecated = self.collect_deprecated(module, duc, anc)
+            deprecated.update(deprecated_imports)
+            dl = {d.name for d in deprecated}
             dl = {d.name for d in deprecated}
             data = {'generator': 'memestra',
                     'deprecated': sorted(dl)}
             self.cache[module_key] = data
             return dl
+
+    def get_deprecated_users(self, defuse, ancestors):
+        deprecated_uses = []
+        for deprecated_node in self.deprecated:
+            for user in defuse.chains[deprecated_node].users():
+                user_ancestors = [n
+                                  for n in ancestors.parents(user.node)
+                                  if isinstance(n, _defs)]
+                if any(f in self.deprecated for f in user_ancestors):
+                    continue
+                deprecated_uses.append((deprecated_node, user,
+                                        user_ancestors[-1] if user_ancestors
+                                        else user.node))
+        return deprecated_uses
 
     def visit_Import(self, node):
         for alias in node.names:
@@ -173,7 +213,7 @@ def prettyname(node):
     return repr(node)
 
 
-def memestra(file_descriptor, decorator, file_path=None):
+def memestra(file_descriptor, decorator, file_path=None, recursive=False):
     '''
     Parse `file_descriptor` and returns a list of
     (function, filename, line, colno) tuples. Each elements
@@ -181,37 +221,33 @@ def memestra(file_descriptor, decorator, file_path=None):
     A deprecated function is a function flagged by `decorator`, where
     `decorator` is a tuple representing an import path,
     e.g. (module, attribute)
+
+    If `recursive` is set to `True`, deprecated use are
+    checked recursively throughout the *whole* module import tree. Otherwise,
+    only one level of import is checked.
     '''
 
     assert not isinstance(decorator, str) and \
            len(decorator) > 1, "decorator is at least (module, attribute)"
 
     module = ast.parse(file_descriptor.read())
-
     # Collect deprecated functions
-    resolver = ImportResolver(decorator, file_path)
+    resolver = ImportResolver(decorator, file_path, recursive)
     resolver.visit(module)
 
     ancestors = resolver.ancestors
     duc = resolver.def_use_chains
 
     # Find their users
-    deprecate_uses = []
-    for deprecated_node in resolver.deprecated:
-        for user in duc.chains[deprecated_node].users():
-            user_ancestors = (n
-                              for n in ancestors.parents(user.node)
-                              if isinstance(n, _defs))
-            if any(f in resolver.deprecated for f in user_ancestors):
-                continue
+    formated_deprecated = []
+    for deprecated_node, user, _ in resolver.get_deprecated_users(duc, ancestors):
+        formated_deprecated.append((prettyname(deprecated_node),
+                               getattr(file_descriptor, 'name', '<>'),
+                               user.node.lineno,
+                               user.node.col_offset))
 
-            deprecate_uses.append((prettyname(deprecated_node),
-                                   getattr(file_descriptor, 'name', '<>'),
-                                   user.node.lineno,
-                                   user.node.col_offset))
-
-    deprecate_uses.sort()
-    return deprecate_uses
+    formated_deprecated.sort()
+    return formated_deprecated
 
 
 def run():
@@ -223,6 +259,9 @@ def run():
     parser.add_argument('--decorator', dest='decorator',
                         default='decorator.deprecated',
                         help='Path to the decorator to check')
+    parser.add_argument('--recursive', dest='recursive',
+                        action='store_true',
+                        help='Traverse the whole module hierarchy')
     parser.add_argument('input', type=argparse.FileType('r'),
                         help='file to scan')
 
@@ -236,7 +275,8 @@ def run():
 
     deprecate_uses = dispatcher[extension](args.input,
                                            args.decorator.split('.'),
-                                           args.input.name)
+                                           args.input.name,
+                                           args.recursive)
 
     for fname, fd, lineno, colno in deprecate_uses:
         print("{} used at {}:{}:{}".format(fname, fd, lineno, colno + 1))

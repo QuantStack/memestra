@@ -21,7 +21,7 @@ class TestCaching(TestCase):
         try:
             os.environ['XDG_CONFIG_HOME'] = tmpdir
             cache = memestra.caching.Cache()
-            key = memestra.caching.CacheKey(__file__)
+            key = memestra.caching.CacheKeyFactory()(__file__)
             self.assertNotIn(key, cache)
             cache[key] = {}
             self.assertIn(key, cache)
@@ -33,7 +33,7 @@ class TestCaching(TestCase):
         try:
             os.environ['XDG_CONFIG_HOME'] = tmpdir
             cache = memestra.caching.Cache()
-            key = memestra.caching.CacheKey(__file__)
+            key = memestra.caching.CacheKeyFactory()(__file__)
             self.assertNotIn(key, cache)
             cache[key] = {}
             data = cache[key]
@@ -49,7 +49,7 @@ class TestCaching(TestCase):
         try:
             os.environ['XDG_CONFIG_HOME'] = tmpdir
             cache = memestra.caching.Cache()
-            key = memestra.caching.CacheKey(__file__)
+            key = memestra.caching.CacheKeyFactory()(__file__)
             with self.assertRaises(ValueError):
                 cache[key] = {'version': -1,
                               'deprecated': [],

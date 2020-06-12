@@ -2,12 +2,74 @@ import os
 import hashlib
 import yaml
 
+# not using gast because we only rely on Import and ImportFrom, which are
+# portable. Not using gast prevents an extra costly conversion step.
+import ast
+
 from memestra.docparse import docparse
+from memestra.utils import resolve_module
+
+
+class DependenciesResolver(ast.NodeVisitor):
+    '''
+    Traverse a module an collect statically imported modules
+    '''
+
+
+    def __init__(self):
+        self.result = set()
+
+    def add_module(self, module_name):
+        module_path = resolve_module(module_name)
+        if module_path is not None:
+            self.result.add(module_path)
+
+    def visit_Import(self, node):
+        for alias in node.names:
+            self.add_module(alias.name)
+
+    def visit_ImportFrom(self, node):
+        self.add_module(node.module)
+
+    # All members below are specialized in order to improve performance:
+    # It's useless to traverse leaf statements and expression when looking for
+    # an import.
+
+    def visit_stmt(self, node):
+        pass
+
+    visit_Assign = visit_AugAssign = visit_AnnAssign = visit_Expr = visit_stmt
+    visit_Return = visit_Print = visit_Raise = visit_Assert = visit_stmt
+    visit_Pass = visit_Break = visit_Continue = visit_Delete = visit_stmt
+    visit_Global = visit_Nonlocal = visit_Exec = visit_stmt
+
+    def visit_body(self, node):
+        for stmt in node.body:
+            self.visit(stmt)
+
+    visit_FunctionDef = visit_ClassDef = visit_AsyncFunctionDef = visit_body
+    visit_With = visit_AsyncWith = visit_body
+
+    def visit_orelse(self, node):
+        for stmt in node.body:
+            self.visit(stmt)
+        for stmt in node.orelse:
+            self.visit(stmt)
+
+    visit_For = visit_While = visit_If = visit_AsyncFor = visit_orelse
+
+    def visit_Try(self, node):
+        for stmt in node.body:
+            self.visit(stmt)
+        for stmt in node.orelse:
+            self.visit(stmt)
+        for stmt in node.finalbody:
+            self.visit(stmt)
 
 
 class Format(object):
 
-    version = 0
+    version = 1
 
     fields = (('version', lambda: Format.version),
               ('name', str),
@@ -64,12 +126,86 @@ class Format(object):
             raise ValueError("deprecated must be a list of string")
 
 
-class CacheKey(object):
+class CacheKeyFactoryBase(object):
+    def __init__(self, keycls):
+        self.keycls = keycls
+        self.created = dict()
 
-    def __init__(self, module_path):
-        self.name, _ = os.path.splitext(os.path.basename(module_path))
-        with open(module_path, 'rb') as fd:
-            self.module_hash = hashlib.sha256(fd.read()).hexdigest()
+    def __call__(self, module_path):
+        if module_path in self.created:
+            return self.created[module_path]
+        else:
+            self.created[module_path] = None  # creation in process
+            key = self.keycls(module_path, self)
+            self.created[module_path] = key
+            return key
+
+    def get(self, *args):
+        return self.created.get(*args)
+
+
+class CacheKeyFactory(CacheKeyFactoryBase):
+    '''
+    Factory for non-recursive keys.
+    Only the content of the module is taken into account
+    '''
+
+    class CacheKey(object):
+
+        def __init__(self, module_path, _):
+            self.name, _ = os.path.splitext(os.path.basename(module_path))
+            with open(module_path, 'rb') as fd:
+                module_content = fd.read()
+                module_hash = hashlib.sha256(module_content).hexdigest()
+                self.module_hash = module_hash
+
+    def __init__(self):
+        super(CacheKeyFactory, self).__init__(CacheKeyFactory.CacheKey)
+
+
+class RecursiveCacheKeyFactory(CacheKeyFactoryBase):
+    '''
+    Factory for recursive keys.
+    This take into account the module content, and the content of *all* imported
+    module. That way, a change in the module hierarchy implies a change in the
+    key.
+    '''
+
+    class CacheKey(object):
+
+        def __init__(self, module_path, factory):
+            assert module_path not in factory.created or factory.created[module_path] is None
+
+            self.name, _ = os.path.splitext(os.path.basename(module_path))
+            with open(module_path, 'rb') as fd:
+                module_content = fd.read()
+
+                code = ast.parse(module_content)
+                dependencies_resolver = DependenciesResolver()
+                dependencies_resolver.visit(code)
+
+                new_deps = []
+                for dep in dependencies_resolver.result:
+                    if factory.get(dep, 1) is not None:
+                        new_deps.append(dep)
+
+                module_hash = hashlib.sha256(module_content).hexdigest()
+
+                hashes = [module_hash]
+
+                for new_dep in sorted(new_deps):
+                    try:
+                        new_dep_key = factory(new_dep)
+                    # FIXME: this only happens on windows, maybe we could do
+                    # better?
+                    except UnicodeDecodeError:
+                        continue
+                    hashes.append(new_dep_key.module_hash)
+
+                self.module_hash = hashlib.sha256("".join(hashes).encode("ascii")).hexdigest()
+
+    def __init__(self):
+        super(RecursiveCacheKeyFactory, self).__init__(RecursiveCacheKeyFactory.CacheKey)
 
 
 class Cache(object):
@@ -128,7 +264,11 @@ def run_set(args):
     data = {'generator': 'manual',
             'deprecated': args.deprecated}
     cache = Cache()
-    key = CacheKey(args.input)
+    if args.recursive:
+        key_factory = RecursiveCacheKeyFactory()
+    else:
+        key_factory = CacheKeyFactory()
+    key = key_factory(args.input)
     cache[key] = data
 
 
@@ -172,6 +312,8 @@ def run():
                             type=str, nargs='+',
                             default='decorator.deprecated',
                             help='function to flag as deprecated')
+    parser_set.add_argument('--recursive', action='store_true',
+                            help='compute a dependency-aware cache key')
     parser_set.add_argument('input', type=str,
                             help='module.py to edit')
     parser_set.set_defaults(runner=run_set)
