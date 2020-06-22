@@ -7,7 +7,7 @@ extras_require = {"test": dev_reqs, "dev": dev_reqs}
 
 setup(
     name="memestra",
-    version="0.0.1",
+    version="0.0.3",
     packages=["memestra"],
     description="Track calls to deprecated functions.",
     long_description="""
