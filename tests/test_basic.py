@@ -212,3 +212,21 @@ class TestClassBasic(TestCase):
         self.checkDeprecatedUses(
             code,
             [('foo', '<>', 11, 0),])
+
+    def test_decoarator_with_param(self):
+        code = '''
+            from decoratortest import deprecated as dp
+
+            @dp()
+            class foo(object): pass
+
+            @dp("ignored")
+            def bar(x):
+                foo()
+
+            bar(foo)'''
+
+        self.checkDeprecatedUses(
+            code,
+            [('bar', '<>', 11, 0),
+             ('foo', '<>', 11, 4)])
