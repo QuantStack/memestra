@@ -5,6 +5,13 @@ Memestra checks code for places where deprecated functions are called.
 
 Judging by the code layout, you'd guess it's in early alpha :-)
 
+Documentation
+-------------
+
+Check out Memestra's full documentation:
+
+https://memestra.readthedocs.io/
+
 Sample Usages
 -------------
 

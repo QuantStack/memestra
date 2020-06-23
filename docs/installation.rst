@@ -7,12 +7,30 @@
 Installation
 ============
 
+From PyPI
+---------
+
+.. code-block:: console
+
+    pip install memestra
+
+From source
+-----------
+
+Clone Memestra's repository.
+
+.. code-block:: console
+
+    git clone git@github.com:QuantStack/memestra.git
+    cd memestra
+    python -m pip install -e .
+
 Using the mamba package
 -----------------------
 
 A package for memestra is available on the mamba package manager:
 
-.. code::
+.. code-block:: console
 
     mamba install -c conda-forge memestra
 
@@ -21,16 +39,6 @@ Using the conda package
 
 A package for memestra is available on the conda package manager:
 
-.. code::
+.. code-block:: console
 
     conda install -c conda-forge memestra
-
-From source
------------
-
-Clone Memestra's repository.
-
-.. code::
-
-    python -m pip install -e .
-

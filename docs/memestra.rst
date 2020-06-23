@@ -14,7 +14,7 @@ To use memestra in your code simply decorate your functions with the decorator y
 
 Memestra receives two arguments in the command line, a positional argument which is the path to file that you want to scan and a optional argument which is the decorator you're using.
 
-.. code::
+.. code-block:: console
 
     memestra path/to/file --decorator=personalizeddecorator.deprecated
 
