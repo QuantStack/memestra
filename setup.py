@@ -5,11 +5,14 @@ kw = {"test_suite": "tests"}
 dev_reqs = open("requirements-dev.txt").read().splitlines()
 extras_require = {"test": dev_reqs, "dev": dev_reqs}
 
+versionfile = os.path.join('memestra', 'version.py')
+exec(open(versionfile).read())
+
 setup(
     name="memestra",
-    version="0.0.3",
+    version=__version__,
     packages=["memestra"],
-    description="Track calls to deprecated functions.",
+    description=__descr__,
     long_description="""
 A linter that tracks reference to deprecated functions.
 
@@ -17,7 +20,7 @@ Memestra walks through your code base and tracks reference to function marks
 with a given decorator.""",
     author="serge-sans-paille",
     author_email="serge.guelton@telecom-bretagne.eu",
-    url="https://github.com/QuantStack/memestra",
+    url=__url__,
     license="BSD 3-Clause",
     install_requires=open("requirements.txt").read().splitlines(),
     extras_require=extras_require,

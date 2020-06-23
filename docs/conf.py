@@ -18,11 +18,14 @@
 # -- Project information -----------------------------------------------------
 
 project = 'Memestra'
-copyright = '2020, Serge Guelton'
-author = 'Serge Guelton'
+copyright = '2020, serge-sans-paille'
+author = 'serge-sans-paille'
+
+versionfile = os.path.join('..', 'memestra', 'version.py')
+exec(open(versionfile).read())
 
 # The full version, including alpha/beta/rc tags
-release = '0.0.1'
+release = __version__
 
 
 # -- General configuration ---------------------------------------------------
