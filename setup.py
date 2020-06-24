@@ -1,3 +1,4 @@
+import os
 from setuptools import setup
 
 kw = {"test_suite": "tests"}
