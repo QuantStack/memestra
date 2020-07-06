@@ -184,9 +184,9 @@ class ImportResolver(ast.NodeVisitor):
                         continue
 
                     # Only handle decorators attached to a def
-                    if not isinstance(parents[-1], _defs):
-                        continue
-                    deprecated.add(parents[-1])
+                    self.extract_decorator_from_parents(
+                        parents,
+                        deprecated)
 
             elif original_path == self.decorator[-1:]:
                 parent = ancestors.parents(dlocal.node)[-1]
@@ -195,12 +195,23 @@ class ImportResolver(ast.NodeVisitor):
                 if parent.module != '.'.join(self.decorator[:-1]):
                     continue
                 for user in dlocal.users():
-                    parent = ancestors.parents(user.node)[-1]
-                    if not isinstance(parent, _defs):
-                        continue
-                    deprecated.add(parent)
+                    self.extract_decorator_from_parents(
+                        ancestors.parents(user.node),
+                        deprecated)
 
         return deprecated
+
+    def extract_decorator_from_parents(self, parents, deprecated):
+        parent = parents[-1]
+        if isinstance(parent, _defs):
+            deprecated.add(parent)
+            return
+        if len(parents) == 1:
+            return
+        parent_p = parents[-2]
+        if isinstance(parent, ast.Call) and isinstance(parent_p, _defs):
+            deprecated.add(parent_p)
+            return
 
 
 def prettyname(node):
