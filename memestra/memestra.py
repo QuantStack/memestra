@@ -11,6 +11,8 @@ from memestra.utils import resolve_module
 
 _defs = ast.AsyncFunctionDef, ast.ClassDef, ast.FunctionDef
 
+def make_deprecated(node, reason=None):
+    return (node, reason)
 
 class SilentDefUseChains(beniget.DefUseChains):
 
@@ -20,7 +22,7 @@ class SilentDefUseChains(beniget.DefUseChains):
 
 class ImportResolver(ast.NodeVisitor):
 
-    def __init__(self, decorator, file_path=None, recursive=False, parent=None):
+    def __init__(self, decorator, reason_keyword, file_path=None, recursive=False, parent=None):
         '''
         Create an ImportResolver that finds deprecated identifiers.
 
@@ -36,6 +38,7 @@ class ImportResolver(ast.NodeVisitor):
         self.decorator = tuple(decorator)
         self.file_path = file_path
         self.recursive = recursive
+        self.reason_keyword = reason_keyword
         if parent:
             self.cache = parent.cache
             self.visited = parent.visited
@@ -82,18 +85,18 @@ class ImportResolver(ast.NodeVisitor):
             if self.recursive and module_path not in self.visited:
                 self.visited.add(module_path)
                 resolver = ImportResolver(self.decorator,
+                                          self.reason_keyword,
                                           self.file_path,
                                           self.recursive,
                                           parent=self)
                 resolver.visit(module)
-                deprecated_imports = [d for _, _, d in
+                deprecated_imports = [make_deprecated(d, reason) for _, _, d, reason in
                                       resolver.get_deprecated_users(duc, anc)]
             else:
                 deprecated_imports = []
             deprecated = self.collect_deprecated(module, duc, anc)
             deprecated.update(deprecated_imports)
-            dl = {d.name for d in deprecated}
-            dl = {d.name for d in deprecated}
+            dl = {d[0].name for d in deprecated if d is not None}
             data = {'generator': 'memestra',
                     'deprecated': sorted(dl)}
             self.cache[module_key] = data
@@ -101,7 +104,7 @@ class ImportResolver(ast.NodeVisitor):
 
     def get_deprecated_users(self, defuse, ancestors):
         deprecated_uses = []
-        for deprecated_node in self.deprecated:
+        for deprecated_node, reason in self.deprecated:
             for user in defuse.chains[deprecated_node].users():
                 user_ancestors = [n
                                   for n in ancestors.parents(user.node)
@@ -110,7 +113,7 @@ class ImportResolver(ast.NodeVisitor):
                     continue
                 deprecated_uses.append((deprecated_node, user,
                                         user_ancestors[-1] if user_ancestors
-                                        else user.node))
+                                        else user.node, reason))
         return deprecated_uses
 
     def visit_Import(self, node):
@@ -123,7 +126,7 @@ class ImportResolver(ast.NodeVisitor):
                 parent = self.ancestors.parents(user.node)[-1]
                 if isinstance(parent, ast.Attribute):
                     if parent.attr in deprecated:
-                        self.deprecated.add(parent)
+                        self.deprecated.add(make_deprecated(parent))
 
     # FIXME: handle relative imports
     def visit_ImportFrom(self, node):
@@ -138,7 +141,7 @@ class ImportResolver(ast.NodeVisitor):
                 index = aliases.index(deprec)
                 alias = node.names[index]
                 for user in self.def_use_chains.chains[alias].users():
-                    self.deprecated.add(user.node)
+                    self.deprecated.add(make_deprecated(user.node))
             except ValueError:
                 continue
 
@@ -155,7 +158,6 @@ class ImportResolver(ast.NodeVisitor):
         self.generic_visit(node)
 
     def collect_deprecated(self, node, duc, ancestors):
-
         deprecated = set()
 
         for dlocal in duc.locals[node]:
@@ -198,21 +200,24 @@ class ImportResolver(ast.NodeVisitor):
                     self.extract_decorator_from_parents(
                         ancestors.parents(user.node),
                         deprecated)
-
         return deprecated
 
     def extract_decorator_from_parents(self, parents, deprecated):
         parent = parents[-1]
         if isinstance(parent, _defs):
-            deprecated.add(parent)
+            deprecated.add(make_deprecated(parent))
             return
         if len(parents) == 1:
             return
         parent_p = parents[-2]
         if isinstance(parent, ast.Call) and isinstance(parent_p, _defs):
-            deprecated.add(parent_p)
+            reason = None
+            # Output only the specified reason with the --reason-keyword flag
+            for keyword in parent.keywords:
+                if self.reason_keyword == keyword.arg:
+                    reason = keyword.value.value
+            deprecated.add(make_deprecated(parent_p, reason=reason))
             return
-
 
 def prettyname(node):
     if isinstance(node, _defs):
@@ -224,7 +229,7 @@ def prettyname(node):
     return repr(node)
 
 
-def memestra(file_descriptor, decorator, file_path=None, recursive=False):
+def memestra(file_descriptor, decorator, reason_keyword, file_path=None, recursive=False):
     '''
     Parse `file_descriptor` and returns a list of
     (function, filename, line, colno) tuples. Each elements
@@ -243,7 +248,7 @@ def memestra(file_descriptor, decorator, file_path=None, recursive=False):
 
     module = ast.parse(file_descriptor.read())
     # Collect deprecated functions
-    resolver = ImportResolver(decorator, file_path, recursive)
+    resolver = ImportResolver(decorator, reason_keyword, file_path, recursive)
     resolver.visit(module)
 
     ancestors = resolver.ancestors
@@ -251,12 +256,12 @@ def memestra(file_descriptor, decorator, file_path=None, recursive=False):
 
     # Find their users
     formated_deprecated = []
-    for deprecated_node, user, _ in resolver.get_deprecated_users(duc, ancestors):
+    for deprecated_node, user, _, reason in resolver.get_deprecated_users(duc, ancestors):
         formated_deprecated.append((prettyname(deprecated_node),
                                getattr(file_descriptor, 'name', '<>'),
                                user.node.lineno,
-                               user.node.col_offset))
-
+                               user.node.col_offset,
+                               reason))
     formated_deprecated.sort()
     return formated_deprecated
 
@@ -270,11 +275,15 @@ def run():
     parser.add_argument('--decorator', dest='decorator',
                         default='decorator.deprecated',
                         help='Path to the decorator to check')
+    parser.add_argument('input', type=argparse.FileType('r'),
+                        help='file to scan')
+    parser.add_argument('--reason-keyword', dest='reason_keyword',
+                        default='reason',
+                        action='store',
+                        help='Specify keyword for deprecation reason')
     parser.add_argument('--recursive', dest='recursive',
                         action='store_true',
                         help='Traverse the whole module hierarchy')
-    parser.add_argument('input', type=argparse.FileType('r'),
-                        help='file to scan')
 
     dispatcher = defaultdict(lambda: memestra)
     for entry_point in iter_entry_points(group='memestra.plugins', name=None):
@@ -286,11 +295,15 @@ def run():
 
     deprecate_uses = dispatcher[extension](args.input,
                                            args.decorator.split('.'),
+                                           args.reason_keyword,
                                            args.input.name,
                                            args.recursive)
 
-    for fname, fd, lineno, colno in deprecate_uses:
-        print("{} used at {}:{}:{}".format(fname, fd, lineno, colno + 1))
+    for fname, fd, lineno, colno, reason in deprecate_uses:
+        formatted_reason = ""
+        if reason:
+            formatted_reason = " - {}".format(reason)
+        print("{} used at {}:{}:{}{}".format(fname, fd, lineno, colno + 1, formatted_reason))
 
 
 if __name__ == '__main__':
