@@ -7,7 +7,7 @@ class TestBasic(TestCase):
 
     def checkDeprecatedUses(self, code, expected_output):
         sio = StringIO(dedent(code))
-        output = memestra.memestra(sio, ('decoratortest', 'deprecated'))
+        output = memestra.memestra(sio, ('decoratortest', 'deprecated'), None)
         self.assertEqual(output, expected_output)
 
 
@@ -25,7 +25,7 @@ class TestBasic(TestCase):
 
         self.checkDeprecatedUses(
             code,
-            [('foo', '<>', 8, 4), ('foo', '<>', 10, 0)])
+            [('foo', '<>', 8, 4, None), ('foo', '<>', 10, 0, None)])
 
     def test_import_alias(self):
         code = '''
@@ -41,7 +41,7 @@ class TestBasic(TestCase):
 
         self.checkDeprecatedUses(
             code,
-            [('foo', '<>', 8, 4), ('foo', '<>', 10, 0)])
+            [('foo', '<>', 8, 4, None), ('foo', '<>', 10, 0, None)])
 
     def test_import_from(self):
         code = '''
@@ -57,7 +57,7 @@ class TestBasic(TestCase):
 
         self.checkDeprecatedUses(
             code,
-            [('foo', '<>', 8, 4), ('foo', '<>', 10, 0)])
+            [('foo', '<>', 8, 4, None), ('foo', '<>', 10, 0, None)])
 
     def test_import_from_alias(self):
         code = '''
@@ -73,7 +73,7 @@ class TestBasic(TestCase):
 
         self.checkDeprecatedUses(
             code,
-            [('foo', '<>', 8, 4), ('foo', '<>', 10, 0)])
+            [('foo', '<>', 8, 4, None), ('foo', '<>', 10, 0, None)])
 
     def test_call_from_deprecated(self):
         code = '''
@@ -90,14 +90,14 @@ class TestBasic(TestCase):
 
         self.checkDeprecatedUses(
             code,
-            [('foo', '<>', 11, 0),])
+            [('foo', '<>', 9, 4, None), ('foo', '<>', 11, 0, None)])
 
 
 class TestClassBasic(TestCase):
 
     def checkDeprecatedUses(self, code, expected_output):
         sio = StringIO(dedent(code))
-        output = memestra.memestra(sio, ('decoratortest', 'deprecated'))
+        output = memestra.memestra(sio, ('decoratortest', 'deprecated'), None)
         self.assertEqual(output, expected_output)
 
 
@@ -115,7 +115,7 @@ class TestClassBasic(TestCase):
 
         self.checkDeprecatedUses(
             code,
-            [('foo', '<>', 8, 4), ('foo', '<>', 10, 0)])
+            [('foo', '<>', 8, 4, None), ('foo', '<>', 10, 0, None)])
 
     def test_import_alias(self):
         code = '''
@@ -131,7 +131,7 @@ class TestClassBasic(TestCase):
 
         self.checkDeprecatedUses(
             code,
-            [('foo', '<>', 8, 4), ('foo', '<>', 10, 0)])
+            [('foo', '<>', 8, 4, None), ('foo', '<>', 10, 0, None)])
 
     def test_import_from(self):
         code = '''
@@ -147,7 +147,7 @@ class TestClassBasic(TestCase):
 
         self.checkDeprecatedUses(
             code,
-            [('foo', '<>', 8, 4), ('foo', '<>', 10, 0)])
+            [('foo', '<>', 8, 4, None), ('foo', '<>', 10, 0, None)])
 
     def test_import_from_alias(self):
         code = '''
@@ -163,7 +163,7 @@ class TestClassBasic(TestCase):
 
         self.checkDeprecatedUses(
             code,
-            [('foo', '<>', 8, 4), ('foo', '<>', 10, 0)])
+            [('foo', '<>', 8, 4, None), ('foo', '<>', 10, 0, None)])
 
     def test_instance_from_deprecated(self):
         code = '''
@@ -180,7 +180,7 @@ class TestClassBasic(TestCase):
 
         self.checkDeprecatedUses(
             code,
-            [('foo', '<>', 11, 0),])
+            [('foo', '<>', 9, 4, None), ('foo', '<>', 11, 0, None)])
 
     def test_use_in_inheritance(self):
         code = '''
@@ -194,7 +194,7 @@ class TestClassBasic(TestCase):
 
         self.checkDeprecatedUses(
             code,
-            [('foo', '<>', 7, 10)])
+            [('foo', '<>', 7, 10, None)])
 
     def test_instance_from_deprecated_class(self):
         code = '''
@@ -211,9 +211,9 @@ class TestClassBasic(TestCase):
 
         self.checkDeprecatedUses(
             code,
-            [('foo', '<>', 11, 0),])
+            [('foo', '<>', 9, 4, None), ('foo', '<>', 11, 0, None)])
 
-    def test_decoarator_with_param(self):
+    def test_decorator_with_param(self):
         code = '''
             from decoratortest import deprecated as dp
 
@@ -228,5 +228,6 @@ class TestClassBasic(TestCase):
 
         self.checkDeprecatedUses(
             code,
-            [('bar', '<>', 11, 0),
-             ('foo', '<>', 11, 4)])
+            [('bar', '<>', 11, 0, None),
+            ('foo', '<>', 9, 4, None),
+            ('foo', '<>', 11, 4, None)])

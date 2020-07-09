@@ -5,13 +5,14 @@ import memestra
 
 import os
 import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'misc'))
+TESTS_FAKE_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), 'misc', 'test.py'))
 
 class TestImports(TestCase):
 
     def checkDeprecatedUses(self, code, expected_output):
         sio = StringIO(dedent(code))
-        output = memestra.memestra(sio, ('decoratortest', 'deprecated'))
+        output = memestra.memestra(sio, ('decoratortest', 'deprecated'), None,
+                                    file_path=TESTS_FAKE_FILE)
         self.assertEqual(output, expected_output)
 
     def test_import_from(self):
@@ -26,7 +27,7 @@ class TestImports(TestCase):
 
         self.checkDeprecatedUses(
             code,
-            [('foo', '<>', 5, 4), ('foo', '<>', 8, 0)])
+            [('foo', '<>', 5, 4, None), ('foo', '<>', 8, 0, None)])
 
     def test_import_from_as(self):
         code = '''
@@ -40,7 +41,7 @@ class TestImports(TestCase):
 
         self.checkDeprecatedUses(
             code,
-            [('Foo', '<>', 5, 4), ('Foo', '<>', 8, 0)])
+            [('Foo', '<>', 5, 4, None), ('Foo', '<>', 8, 0, None)])
 
     def test_import(self):
         code = '''
@@ -54,7 +55,7 @@ class TestImports(TestCase):
 
         self.checkDeprecatedUses(
             code,
-            [('some_module.foo', '<>', 5, 4), ('some_module.foo', '<>', 8, 0)])
+            [('some_module.foo', '<>', 5, 4, None), ('some_module.foo', '<>', 8, 0, None)])
 
     def test_import_as(self):
         code = '''
@@ -68,14 +69,14 @@ class TestImports(TestCase):
 
         self.checkDeprecatedUses(
             code,
-            [('Module.foo', '<>', 5, 4), ('Module.foo', '<>', 8, 0)])
+            [('Module.foo', '<>', 5, 4, None), ('Module.foo', '<>', 8, 0, None)])
 
 class TestRecImports(TestCase):
 
     def checkDeprecatedUses(self, code, expected_output):
         sio = StringIO(dedent(code))
-        output = memestra.memestra(sio, ('decoratortest', 'deprecated'),
-                                   recursive=True)
+        output = memestra.memestra(sio, ('decoratortest', 'deprecated'), None,
+                                   file_path=TESTS_FAKE_FILE, recursive=True)
         self.assertEqual(output, expected_output)
 
     def test_import(self):
@@ -90,8 +91,8 @@ class TestRecImports(TestCase):
 
         self.checkDeprecatedUses(
             code,
-            [('some_rec_module.foo', '<>', 5, 4),
-             ('some_rec_module.foo', '<>', 8, 0)])
+            [('some_rec_module.foo', '<>', 5, 4, None),
+             ('some_rec_module.foo', '<>', 8, 0, None)])
 
     def test_import_from0(self):
         code = '''
@@ -104,7 +105,7 @@ class TestRecImports(TestCase):
 
         self.checkDeprecatedUses(
             code,
-            [('foo', '<>', 5, 4), ('foo', '<>', 7, 0)])
+            [('foo', '<>', 5, 4, None), ('foo', '<>', 7, 0, None)])
 
     def test_import_from1(self):
         code = '''

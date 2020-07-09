@@ -5,13 +5,14 @@ import memestra
 
 import os
 import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'misc'))
+TESTS_FAKE_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), 'misc', 'test.py'))
 
 class TestMultiAttr(TestCase):
 
     def checkDeprecatedUses(self, code, expected_output):
         sio = StringIO(dedent(code))
-        output = memestra.memestra(sio, ('decorator', 'sub', 'deprecated'))
+        output = memestra.memestra(sio, ('decorator', 'sub', 'deprecated'), None,
+                                    file_path=TESTS_FAKE_FILE)
         self.assertEqual(output, expected_output)
 
     def test_import(self):
@@ -28,7 +29,7 @@ class TestMultiAttr(TestCase):
 
         self.checkDeprecatedUses(
             code,
-            [('foo', '<>', 8, 4), ('foo', '<>', 10, 0)])
+            [('foo', '<>', 8, 4, None), ('foo', '<>', 10, 0, None)])
 
     def test_import_alias(self):
         code = '''
@@ -44,7 +45,7 @@ class TestMultiAttr(TestCase):
 
         self.checkDeprecatedUses(
             code,
-            [('foo', '<>', 8, 4), ('foo', '<>', 10, 0)])
+            [('foo', '<>', 8, 4, None), ('foo', '<>', 10, 0, None)])
 
     def test_import_sub_alias(self):
         code = '''
@@ -60,7 +61,7 @@ class TestMultiAttr(TestCase):
 
         self.checkDeprecatedUses(
             code,
-            [('foo', '<>', 8, 4), ('foo', '<>', 10, 0)])
+            [('foo', '<>', 8, 4, None), ('foo', '<>', 10, 0, None)])
 
     def test_import_from(self):
         code = '''
@@ -76,7 +77,7 @@ class TestMultiAttr(TestCase):
 
         self.checkDeprecatedUses(
             code,
-            [('foo', '<>', 8, 4), ('foo', '<>', 10, 0)])
+            [('foo', '<>', 8, 4, None), ('foo', '<>', 10, 0, None)])
 
     def test_import_from_alias(self):
         code = '''
@@ -92,4 +93,4 @@ class TestMultiAttr(TestCase):
 
         self.checkDeprecatedUses(
             code,
-            [('foo', '<>', 8, 4), ('foo', '<>', 10, 0)])
+            [('foo', '<>', 8, 4, None), ('foo', '<>', 10, 0, None)])
