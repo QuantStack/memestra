@@ -1,9 +1,9 @@
 Memestra-cache
 ==============
 
-To handle the cache, memestra installs a tool named ``memestra-cache``.
+Memestra uses a cache to speedup some computations. To handle the cache, memestra installs a tool named ``memestra-cache``.
 
-Memestra's caching infrastructure is a file-based cache, located in ~/.memestra (RW) and in memestra/cache (RO). The key is a hash of the file content and the value is deprecation information, generator used, etc.
+Memestra's caching infrastructure is a file-based cache, located in home/<user>/.memestra (RW) and in <prefix>/memestra/cache (RO). The key is a hash of the file content and the value is deprecation information, generator used, etc.
 
 There are two kind of keys: recursive and non-recursive. The recursive one also uses the hash of imported modules, so that if an imported module changes, the hash of the importing module aslo changes.
 
@@ -15,7 +15,7 @@ To interact with memestra cache:
 
 Set a cache entry
 
-`-list``
+``-list``
 
 List cache entries
 
