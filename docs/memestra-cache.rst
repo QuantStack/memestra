@@ -29,6 +29,7 @@ Set cache entry from docstring
 
 
 **Optional arguments:**
+
   ``-h, --help``
 
   Show this help message and exit
