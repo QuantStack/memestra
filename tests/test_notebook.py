@@ -8,6 +8,8 @@ from nbconvert import RSTExporter
 
 this_dir = os.path.dirname(os.path.abspath(__file__))
 TESTS_NB_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), 'misc', 'memestra_nb_demo.ipynb'))
+import sys
+sys.path.insert(0, os.path.join(this_dir, 'misc'))
 
 class NotebookTest(TestCase):
 
