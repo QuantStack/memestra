@@ -1,3 +1,5 @@
+#if reason is None and there is a string there then show the string as a reson
+
 import beniget
 import gast as ast
 import os
@@ -213,6 +215,8 @@ class ImportResolver(ast.NodeVisitor):
         if isinstance(parent, ast.Call) and isinstance(parent_p, _defs):
             reason = None
             # Output only the specified reason with the --reason-keyword flag
+            if len(parent.keywords) == 0 and parent.args:
+                reason = parent.args[0].value
             for keyword in parent.keywords:
                 if self.reason_keyword == keyword.arg:
                     reason = keyword.value.value
