@@ -12,7 +12,7 @@ Using memestra
 
 To use memestra in your code simply decorate your functions with the decorator you wish to use. The default decorator for memestra is ``@decorator.deprecated`` and you can find more about it here_.
 
-Memestra receive one mandatory argument in the command line, which is a positional argument, or the path to file that you want to scan.
+Memestra receives one mandatory argument in the command line, which is a positional argument, or the path to file that you want to scan.
 
 .. code-block:: console
 
@@ -34,6 +34,7 @@ Besides that there are a few optional arguments that you can use.
 ``--reason-keyword``
 
   It's possible to show a message to the user specifying the reason why the code was deprecated. With this flag you can choose a different keyword, the default is ``reason``.
+  If the user doesn't specify a reason keyword and doesn't pass any other keyword but still add a string in the wrapper call this string will be shown as the reason for the deprecation.
 
 ``--recursive``
 
