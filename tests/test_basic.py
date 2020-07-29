@@ -228,6 +228,6 @@ class TestClassBasic(TestCase):
 
         self.checkDeprecatedUses(
             code,
-            [('bar', '<>', 11, 0, None),
+            [('bar', '<>', 11, 0, 'ignored'),
             ('foo', '<>', 9, 4, None),
             ('foo', '<>', 11, 4, None)])

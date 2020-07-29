@@ -21,7 +21,7 @@ class TestBasic(TestCase):
         code = '''
             import deprecated
 
-            @deprecated.deprecated(reason="use another function")
+            @deprecated.deprecated(reason='use another function')
             def foo(): pass
 
             foo()'''
@@ -34,20 +34,20 @@ class TestBasic(TestCase):
         code = '''
             import deprecated
 
-            @deprecated.deprecated("use another function")
+            @deprecated.deprecated('use another function')
             def foo(): pass
 
             foo()'''
 
         self.checkDeprecatedUses(code,
-            [('foo', '<>', 7, 0, None)])
+            [('foo', '<>', 7, 0, 'use another function')])
 
     def test_multiple_args(self):
         code = '''
             import deprecated
 
-            @deprecated.deprecated(unrelated="unrelated content",
-                type="magical", reason="another reason")
+            @deprecated.deprecated(unrelated='unrelated content',
+                type='magical', reason='another reason')
             def foo(): pass
 
             foo()'''
