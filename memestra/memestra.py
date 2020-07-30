@@ -215,7 +215,7 @@ class ImportResolver(ast.NodeVisitor):
         if isinstance(parent, ast.Call) and isinstance(parent_p, _defs):
             reason = None
             # Output only the specified reason with the --reason-keyword flag
-            if len(parent.keywords) == 0 and parent.args:
+            if not parent.keywords and parent.args:
                 reason = parent.args[0].value
             for keyword in parent.keywords:
                 if self.reason_keyword == keyword.arg:
