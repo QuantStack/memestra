@@ -5,7 +5,6 @@ import nbformat
 
 
 def nbmemestra_from_nbnode(nb, decorator, filepath, reason_keyword='reason'):
-    print('nbmemestra_from_nbnode:', decorator, filepath, reason_keyword)
     # Get code cells
     cells = nb.cells
     code_cells = [c for c in cells if c['cell_type'] == 'code']
@@ -24,8 +23,6 @@ def nbmemestra_from_nbnode(nb, decorator, filepath, reason_keyword='reason'):
 
     # Collect calls to deprecated functions
     deprecated_list = memestra(StringIO(code), decorator, reason_keyword, filepath)
-
-    print(deprecated_list)
 
     # Map them to cells
     result = []
