@@ -7,23 +7,24 @@ from nbconvert import RSTExporter
 
 
 this_dir = os.path.dirname(os.path.abspath(__file__))
-
+TESTS_NB_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), 'misc', 'memestra_nb_demo.ipynb'))
+import sys
+sys.path.insert(0, os.path.join(this_dir, 'misc'))
 
 class NotebookTest(TestCase):
 
     def test_nb_demo(self):
-        output = nbmemestra.nbmemestra(os.path.join(this_dir, 'misc',
-                                       'memestra_nb_demo.ipynb'),
+        output = nbmemestra.nbmemestra(TESTS_NB_FILE,
                                        ('decoratortest', 'deprecated'),
-                                       os.path.join(this_dir, 'misc',
-                                       'memestra_nb_demo.ipynb'))
+                                       TESTS_NB_FILE)
         expected_output = [('some_module.foo', 'Cell[0]', 2, 0),
                            ('some_module.foo', 'Cell[0]', 3, 0),
                            ('some_module.foo', 'Cell[2]', 2, 4)]
         self.assertEqual(output, expected_output)
 
     def test_nbconvert_demo(self):
-        with open(os.path.join(this_dir, 'misc', 'memestra_nb_demo.ipynb')) as f:
+        self.maxDiff = None
+        with open(TESTS_NB_FILE) as f:
             notebook = nbformat.read(f, as_version=4)
 
         c = Config()
