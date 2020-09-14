@@ -1,9 +1,8 @@
 Memestra!
 =========
 
-Memestra checks code for places where deprecated functions are called.
+Memestra, a static analysis tool for Python, which detects the use of deprecated APIs.
 
-Judging by the code layout, you'd guess it's in early alpha :-)
 
 Documentation
 -------------
@@ -74,3 +73,9 @@ Track usage of functions decorated by ``deprecated`` imported from
     foo used at test3.py:7:5
     foo used at test3.py:9:1
 
+
+### License
+
+We use a shared copyright model that enables all contributors to maintain the copyright on their contributions.
+
+This software is licensed under the BSD-3-Clause license. See the [LICENSE](LICENSE) file for details.
