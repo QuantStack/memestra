@@ -277,7 +277,7 @@ def run():
 
     parser = argparse.ArgumentParser(description='Check decorator usage.')
     parser.add_argument('--decorator', dest='decorator',
-                        default='decorator.deprecated',
+                        default='deprecated.deprecated',
                         help='Path to the decorator to check')
     parser.add_argument('input', type=argparse.FileType('r'),
                         help='file to scan')
