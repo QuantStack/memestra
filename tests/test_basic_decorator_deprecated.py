@@ -55,3 +55,20 @@ class TestBasic(TestCase):
         self.checkDeprecatedUses(
             code,
             [('foo', '<>', 8, 0, 'another reason')])
+
+class TestDefaultDecorator(TestCase):
+
+    def checkDeprecatedUses(self, code, expected_output):
+        sio = StringIO(dedent(code))
+        output = memestra.memestra(sio, file_path=TESTS_FAKE_FILE)
+        self.assertEqual(output, expected_output)
+
+
+    def test_default_kwarg(self):
+        code = '''
+            import deprecated
+
+            @deprecated.deprecated(reason='use another function')
+            def foo(): pass
+
+            foo()'''
