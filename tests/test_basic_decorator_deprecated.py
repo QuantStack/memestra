@@ -1,5 +1,7 @@
-from unittest import TestCase
+from unittest import TestCase, mock
 from textwrap import dedent
+import tempfile
+import contextlib
 from io import StringIO
 
 import memestra
@@ -56,15 +58,11 @@ class TestBasic(TestCase):
             code,
             [('foo', '<>', 8, 0, 'another reason')])
 
-class TestDefaultDecorator(TestCase):
 
-    def checkDeprecatedUses(self, code, expected_output):
-        sio = StringIO(dedent(code))
-        output = memestra.memestra(sio, file_path=TESTS_FAKE_FILE)
-        self.assertEqual(output, expected_output)
-
+class TestCLI(TestCase):
 
     def test_default_kwarg(self):
+        fid, tmppy = tempfile.mkstemp(suffix='.py')
         code = '''
             import deprecated
 
@@ -72,3 +70,14 @@ class TestDefaultDecorator(TestCase):
             def foo(): pass
 
             foo()'''
+
+        ref = 'foo used at {}:7:1 - use another function\n'.format(tmppy)
+        os.write(fid, dedent(code).encode())
+        os.close(fid)
+        test_args = ['memestra', tmppy]
+        with mock.patch.object(sys, 'argv', test_args):
+            from memestra.memestra import run
+            with StringIO() as buf:
+                with contextlib.redirect_stdout(buf):
+                    run()
+                self.assertEqual(buf.getvalue(), ref)
