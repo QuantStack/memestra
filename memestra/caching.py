@@ -289,7 +289,11 @@ def run_docparse(args):
     deprecated = docparse(args.input, args.pattern)
 
     cache = Cache()
-    key = CacheKey(args.input)
+    if args.recursive:
+        key_factory = RecursiveCacheKeyFactory()
+    else:
+        key_factory = CacheKeyFactory()
+    key = key_factory(args.input)
     data = {'deprecated': deprecated,
             'generator': 'manual'}
     cache[key] = data
@@ -313,7 +317,7 @@ def run():
                             default='decorator.deprecated',
                             help='function to flag as deprecated')
     parser_set.add_argument('--recursive', action='store_true',
-                            help='compute a dependency-aware cache key')
+                            help='set a dependency-aware cache key')
     parser_set.add_argument('input', type=str,
                             help='module.py to edit')
     parser_set.set_defaults(runner=run_set)
@@ -328,11 +332,13 @@ def run():
     parser_docparse = subparsers.add_parser(
         'docparse',
         help='Set cache entry from docstring')
-    parser_docparse.add_argument('-v,--verbose', dest='verbose',
+    parser_docparse.add_argument('-v', '--verbose', dest='verbose',
                                  action='store_true')
     parser_docparse.add_argument(
         '--pattern', dest='pattern', type=str, default=r'.*deprecated.*',
         help='pattern found in deprecated function docstring')
+    parser_docparse.add_argument('--recursive', action='store_true',
+                                 help='set a dependency-aware cache key')
     parser_docparse.add_argument('input', type=str,
                                  help='module.py to scan')
     parser_docparse.set_defaults(runner=run_docparse)

@@ -22,6 +22,12 @@ class SilentDefUseChains(beniget.DefUseChains):
         pass
 
 
+class SilentDefUseChains(beniget.DefUseChains):
+
+    def unbound_identifier(self, name, node):
+        pass
+
+
 class ImportResolver(ast.NodeVisitor):
 
     def __init__(self, decorator, reason_keyword, file_path=None, recursive=False, parent=None):
