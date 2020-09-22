@@ -5,9 +5,9 @@ import memestra
 
 class TestBasic(TestCase):
 
-    def checkDeprecatedUses(self, code, expected_output):
+    def checkDeprecatedUses(self, code, expected_output, decorator=('decoratortest', 'deprecated')):
         sio = StringIO(dedent(code))
-        output = memestra.memestra(sio, ('decoratortest', 'deprecated'), None)
+        output = memestra.memestra(sio, decorator, None)
         self.assertEqual(output, expected_output)
 
 
@@ -91,6 +91,23 @@ class TestBasic(TestCase):
         self.checkDeprecatedUses(
             code,
             [('foo', '<>', 9, 4, None), ('foo', '<>', 11, 0, None)])
+
+    def test_import_from_same_module_and_decorator(self):
+        code = '''
+            from deprecated import deprecated
+
+            @deprecated
+            def foo(): pass
+
+            def bar():
+                foo()
+
+            foo()'''
+
+        self.checkDeprecatedUses(
+            code,
+            [('foo', '<>', 8, 4, None), ('foo', '<>', 10, 0, None)],
+            ('deprecated', 'deprecated'))
 
 
 class TestClassBasic(TestCase):

@@ -174,6 +174,25 @@ class ImportResolver(ast.NodeVisitor):
                 continue
 
             original_path = tuple(dnode.name.split('.'))
+
+            # for imports with a "from" clause, such as
+            #
+            #   from foo import bar
+            #
+            # the AST alias will be just `bar`, but we want any functions
+            # defined as such:
+            #
+            # @bar
+            # def foo(): pass
+            #
+            # to be picked up when `foo.bar` is used as the target decorator. we
+            # check if the parent of the alias is an ImportFrom node and fix the
+            # original path to be fully qualified here. In the example above, it
+            # becomes `foo.bar` instead of just `bar`.
+            alias_parent = ancestors.parents(dnode)[-1]
+            if isinstance(alias_parent, ast.ImportFrom):
+                original_path = tuple(alias_parent.module.split('.')) + original_path
+
             nbterms = len(original_path)
 
             if original_path == self.decorator[:nbterms]:
@@ -196,17 +215,6 @@ class ImportResolver(ast.NodeVisitor):
                     # Only handle decorators attached to a def
                     self.extract_decorator_from_parents(
                         parents,
-                        deprecated)
-
-            elif original_path == self.decorator[-1:]:
-                parent = ancestors.parents(dlocal.node)[-1]
-                if not isinstance(parent, ast.ImportFrom):
-                    continue
-                if parent.module != '.'.join(self.decorator[:-1]):
-                    continue
-                for user in dlocal.users():
-                    self.extract_decorator_from_parents(
-                        ancestors.parents(user.node),
                         deprecated)
         return deprecated
 
