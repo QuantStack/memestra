@@ -74,7 +74,8 @@ Track usage of functions decorated by ``deprecated`` imported from
     foo used at test3.py:9:1
 
 
-### License
+License
+-------
 
 We use a shared copyright model that enables all contributors to maintain the copyright on their contributions.
 
