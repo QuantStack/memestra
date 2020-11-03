@@ -21,3 +21,4 @@ install:
 # command to run tests
 script:
   - pytest -v
+  - pytest -v  # run test twic because the first run populates the cache, so they are not exactly equivalent
