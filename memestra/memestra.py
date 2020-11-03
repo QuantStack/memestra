@@ -16,6 +16,15 @@ _defs = ast.AsyncFunctionDef, ast.ClassDef, ast.FunctionDef
 def make_deprecated(node, reason=None):
     return (node, reason)
 
+def store_deprecated(name, reason):
+    return name if reason is None else '{}:{}'.format(name, reason)
+
+def load_deprecated(entry):
+    if ':' in entry:
+        return entry.split(':', maxsplit=1)
+    else:
+        return entry, None
+
 class SilentDefUseChains(beniget.DefUseChains):
 
     def unbound_identifier(self, name, node):
@@ -70,14 +79,15 @@ class ImportResolver(ast.NodeVisitor):
         if module_key in self.cache:
             data = self.cache[module_key]
             if data['version'] == Format.version:
-                return set(data['deprecated'])
+                return dict(load_deprecated(entry)
+                            for entry in data['deprecated'])
             elif data['generator'] == 'manual':
                 warnings.warn(
                     ("skipping module {} because it has an obsolete, "
                      "manually generated, cache file: {}")
                     .format(module_name,
                             module_key.module_hash))
-                return []
+                return {}
 
         with open(module_path) as fd:
             try:
@@ -98,15 +108,17 @@ class ImportResolver(ast.NodeVisitor):
                                           self.recursive,
                                           parent=self)
                 resolver.visit(module)
-                deprecated_imports = [make_deprecated(d, reason) for _, _, d, reason in
+                deprecated_imports = [make_deprecated(d, reason)
+                                      for _, _, d, reason in
                                       resolver.get_deprecated_users(duc, anc)]
             else:
                 deprecated_imports = []
             deprecated = self.collect_deprecated(module, duc, anc)
             deprecated.update(deprecated_imports)
-            dl = {d[0].name for d in deprecated if d is not None}
+            dl = {d[0].name: d[1] for d in deprecated if d is not None}
             data = {'generator': 'memestra',
-                    'deprecated': sorted(dl)}
+                    'deprecated': [store_deprecated(d, dl[d]) for d in
+                                   sorted(dl)]}
             self.cache[module_key] = data
             return dl
 
@@ -134,7 +146,8 @@ class ImportResolver(ast.NodeVisitor):
                 parent = self.ancestors.parents(user.node)[-1]
                 if isinstance(parent, ast.Attribute):
                     if parent.attr in deprecated:
-                        self.deprecated.add(make_deprecated(parent))
+                        reason = deprecated[parent.attr]
+                        self.deprecated.add(make_deprecated(parent, reason))
 
     # FIXME: handle relative imports
     def visit_ImportFrom(self, node):
@@ -144,12 +157,12 @@ class ImportResolver(ast.NodeVisitor):
 
         aliases = [alias.name for alias in node.names]
 
-        for deprec in deprecated:
+        for deprec, reason in deprecated.items():
             try:
                 index = aliases.index(deprec)
                 alias = node.names[index]
                 for user in self.def_use_chains.chains[alias].users():
-                    self.deprecated.add(make_deprecated(user.node))
+                    self.deprecated.add(make_deprecated(user.node, reason))
             except ValueError:
                 continue
 
@@ -234,7 +247,7 @@ class ImportResolver(ast.NodeVisitor):
             for keyword in parent.keywords:
                 if self.reason_keyword == keyword.arg:
                     reason = keyword.value.value
-            deprecated.add(make_deprecated(parent_p, reason=reason))
+            deprecated.add(make_deprecated(parent_p, reason))
             return
 
 def prettyname(node):
