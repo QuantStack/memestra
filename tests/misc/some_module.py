@@ -4,3 +4,6 @@ from decoratortest import deprecated
 def foo(): pass
 
 def bar(): pass
+
+@deprecated("because it's too old")
+def foobar(): pass

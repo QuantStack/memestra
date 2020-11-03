@@ -17,7 +17,8 @@ class TestImports(TestCase):
 
     def test_import_from(self):
         code = '''
-            from some_module import foo, bar
+            from some_module import foo, bar, foobar
+            foobar()
 
             def foobar():
                 foo()
@@ -27,7 +28,9 @@ class TestImports(TestCase):
 
         self.checkDeprecatedUses(
             code,
-            [('foo', '<>', 5, 4, None), ('foo', '<>', 8, 0, None)])
+            [('foo', '<>', 6, 4, None),
+             ('foo', '<>', 9, 0, None),
+             ('foobar', '<>', 3, 0, "because it's too old")])
 
     def test_import_from_as(self):
         code = '''
