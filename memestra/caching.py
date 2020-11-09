@@ -313,8 +313,7 @@ def run():
 
     parser_set = subparsers.add_parser('set', help='Set a cache entry')
     parser_set.add_argument('--deprecated', dest='deprecated',
-                            type=str, nargs='+',
-                            default='decorator.deprecated',
+                            action='append',
                             help='function to flag as deprecated')
     parser_set.add_argument('--recursive', action='store_true',
                             help='set a dependency-aware cache key')
