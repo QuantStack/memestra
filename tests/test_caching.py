@@ -126,3 +126,31 @@ class TestCLI(TestCase):
         key = memestra.caching.CacheKeyFactory()(tmppy.name)
         os.remove(tmppy.name)
         self.assertEqual(cache[key], expected)
+
+    def test_cache_dir(self):
+        fid, tmppy = tempfile.mkstemp(suffix='.py')
+        code = '''
+            def foo()
+                pass
+
+            foo()'''
+
+        ref = ''
+        os.write(fid, dedent(code).encode())
+        os.close(fid)
+        try:
+            tmpdir = tempfile.mkdtemp()
+            set_args = ['memestra-cache',
+                        '--cache-dir=' + tmpdir,
+                        'set',
+                        '--deprecated=foo',
+                        tmppy]
+            with mock.patch.object(sys, 'argv', set_args):
+                from memestra.caching import run
+                run()
+
+            key = memestra.caching.CacheKeyFactory()(tmppy)
+            cachefile = os.path.join(tmpdir, key.module_hash)
+            self.assertTrue(os.path.isfile(cachefile))
+        finally:
+            shutil.rmtree(tmpdir)
