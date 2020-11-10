@@ -22,9 +22,10 @@ class TestCaching(TestCase):
 
     def test_cache_dir(self):
         tmpdir = tempfile.mkdtemp()
+        cachedir = os.path.join(tmpdir, "memestra-test")
         try:
-            cache = memestra.caching.Cache(cache_dir=tmpdir)
-            self.assertTrue(os.path.isdir(os.path.join(tmpdir)))
+            cache = memestra.caching.Cache(cache_dir=cachedir)
+            self.assertTrue(os.path.isdir(cachedir))
         finally:
             shutil.rmtree(tmpdir)
 
