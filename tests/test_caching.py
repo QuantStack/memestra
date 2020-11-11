@@ -85,34 +85,34 @@ class TestCLI(TestCase):
                 self.assertEqual(buf.getvalue(), ref)
     
     def test_set_cache(self):
-        fid, tmppy = tempfile.mkstemp(suffix='.py')
-        code = '''
-            def foo()
-                pass
+        with tempfile.NamedTemporaryFile(suffix='.py', delete=False) as tmppy:
+            code = '''
+                def foo()
+                    pass
 
-            def bar()
-                pass
+                def bar()
+                    pass
 
-            foo()
-            bar()'''
+                foo()
+                bar()'''
+
+            tmppy.write(dedent(code).encode())
 
         ref = ''
-        os.write(fid, dedent(code).encode())
-        os.close(fid)
         set_args = ['memestra-cache', 'set',
-                     '--deprecated', 'foo',
-                     '--deprecated', 'bar',
-                     tmppy]
+                    '--deprecated', 'foo',
+                    '--deprecated', 'bar',
+                    tmppy.name]
         with mock.patch.object(sys, 'argv', set_args):
             from memestra.caching import run
             run()
-        
+
         expected = {
             'deprecated': ['foo', 'bar'],
             'generator': 'manual',
-            'name':  os.path.splitext(os.path.basename(tmppy))[0],
+            'name':  os.path.splitext(os.path.basename(tmppy.name))[0],
             'version': 1,
         }
         cache = memestra.caching.Cache()
-        key = memestra.caching.CacheKeyFactory()(tmppy)
+        key = memestra.caching.CacheKeyFactory()(tmppy.name)
         self.assertEqual(cache[key], expected)
