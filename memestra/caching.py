@@ -211,7 +211,7 @@ class RecursiveCacheKeyFactory(CacheKeyFactoryBase):
 class Cache(object):
 
     def __init__(self, cache_dir=None):
-        if cache_dir:
+        if cache_dir is not None:
             self.cachedir = cache_dir
         else:
             xdg_config_home = os.environ.get('XDG_CONFIG_HOME', None)

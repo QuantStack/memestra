@@ -128,28 +128,28 @@ class TestCLI(TestCase):
         self.assertEqual(cache[key], expected)
 
     def test_cache_dir(self):
-        fid, tmppy = tempfile.mkstemp(suffix='.py')
-        code = '''
-            def foo()
-                pass
+        with tempfile.NamedTemporaryFile(suffix='.py', delete=False) as tmppy:
+            code = '''
+                def foo()
+                    pass
 
-            foo()'''
+                foo()'''
 
-        ref = ''
-        os.write(fid, dedent(code).encode())
-        os.close(fid)
+            tmppy.write(dedent(code).encode())
+
         try:
             tmpdir = tempfile.mkdtemp()
+            ref = ''
             set_args = ['memestra-cache',
                         '--cache-dir=' + tmpdir,
                         'set',
                         '--deprecated=foo',
-                        tmppy]
+                        tmppy.name]
             with mock.patch.object(sys, 'argv', set_args):
                 from memestra.caching import run
                 run()
 
-            key = memestra.caching.CacheKeyFactory()(tmppy)
+            key = memestra.caching.CacheKeyFactory()(tmppy.name)
             cachefile = os.path.join(tmpdir, key.module_hash)
             self.assertTrue(os.path.isfile(cachefile))
         finally:
