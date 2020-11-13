@@ -115,4 +115,5 @@ class TestCLI(TestCase):
         }
         cache = memestra.caching.Cache()
         key = memestra.caching.CacheKeyFactory()(tmppy.name)
+        os.remove(tmppy.name)
         self.assertEqual(cache[key], expected)
