@@ -154,3 +154,4 @@ class TestCLI(TestCase):
             self.assertTrue(os.path.isfile(cachefile))
         finally:
             shutil.rmtree(tmpdir)
+            os.remove(tmppy.name)
