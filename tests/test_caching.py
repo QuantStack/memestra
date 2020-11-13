@@ -153,5 +153,6 @@ class TestCLI(TestCase):
             cachefile = os.path.join(tmpdir, key.module_hash)
             self.assertTrue(os.path.isfile(cachefile))
         finally:
-            shutil.rmtree(tmpdir)
             os.remove(tmppy.name)
+            shutil.rmtree(tmpdir)
+
