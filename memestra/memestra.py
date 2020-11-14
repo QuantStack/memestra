@@ -39,7 +39,8 @@ class SilentDefUseChains(beniget.DefUseChains):
 
 class ImportResolver(ast.NodeVisitor):
 
-    def __init__(self, decorator, reason_keyword, file_path=None, recursive=False, parent=None):
+    def __init__(self, decorator, reason_keyword, file_path=None,
+                 recursive=False, parent=None, cache_dir=None):
         '''
         Create an ImportResolver that finds deprecated identifiers.
 
@@ -61,7 +62,7 @@ class ImportResolver(ast.NodeVisitor):
             self.visited = parent.visited
             self.key_factory = parent.key_factory
         else:
-            self.cache = Cache()
+            self.cache = Cache(cache_dir=cache_dir)
             self.visited = set()
             if recursive:
                 self.key_factory = RecursiveCacheKeyFactory()
@@ -260,7 +261,8 @@ def prettyname(node):
     return repr(node)
 
 
-def memestra(file_descriptor, decorator, reason_keyword, file_path=None, recursive=False):
+def memestra(file_descriptor, decorator, reason_keyword,
+             file_path=None, recursive=False, cache_dir=None):
     '''
     Parse `file_descriptor` and returns a list of
     (function, filename, line, colno) tuples. Each elements
@@ -279,7 +281,8 @@ def memestra(file_descriptor, decorator, reason_keyword, file_path=None, recursi
 
     module = ast.parse(file_descriptor.read())
     # Collect deprecated functions
-    resolver = ImportResolver(decorator, reason_keyword, file_path, recursive)
+    resolver = ImportResolver(decorator, reason_keyword, file_path,
+                              recursive, cache_dir=cache_dir)
     resolver.visit(module)
 
     ancestors = resolver.ancestors
@@ -312,6 +315,10 @@ def run():
                         default='reason',
                         action='store',
                         help='Specify keyword for deprecation reason')
+    parser.add_argument('--cache-dir', dest='cache_dir',
+                        default=None,
+                        action='store',
+                        help='The directory where the cache is located')
     parser.add_argument('--recursive', dest='recursive',
                         action='store_true',
                         help='Traverse the whole module hierarchy')
@@ -328,7 +335,8 @@ def run():
                                            args.decorator.split('.'),
                                            args.reason_keyword,
                                            args.input.name,
-                                           args.recursive)
+                                           args.recursive,
+                                           args.cache_dir)
 
     for fname, fd, lineno, colno, reason in deprecate_uses:
         formatted_reason = ""

@@ -210,16 +210,20 @@ class RecursiveCacheKeyFactory(CacheKeyFactoryBase):
 
 class Cache(object):
 
-    def __init__(self):
-        xdg_config_home = os.environ.get('XDG_CONFIG_HOME', None)
-        if xdg_config_home is None:
-            user_config_dir = '~'
-            memestra_dir = '.memestra'
+    def __init__(self, cache_dir=None):
+        if cache_dir is not None:
+            self.cachedir = cache_dir
         else:
-            user_config_dir = xdg_config_home
-            memestra_dir = 'memestra'
-        self.cachedir = os.path.expanduser(os.path.join(user_config_dir,
-                                                        memestra_dir))
+            xdg_config_home = os.environ.get('XDG_CONFIG_HOME', None)
+            if xdg_config_home is None:
+                user_config_dir = '~'
+                memestra_dir = '.memestra'
+            else:
+                user_config_dir = xdg_config_home
+                memestra_dir = 'memestra'
+            self.cachedir = os.path.expanduser(os.path.join(user_config_dir,
+                                                            memestra_dir))
+
         os.makedirs(self.cachedir, exist_ok=True)
 
     def _get_path(self, key):
@@ -263,7 +267,7 @@ class Cache(object):
 def run_set(args):
     data = {'generator': 'manual',
             'deprecated': args.deprecated}
-    cache = Cache()
+    cache = Cache(cache_dir=args.cache_dir)
     if args.recursive:
         key_factory = RecursiveCacheKeyFactory()
     else:
@@ -273,13 +277,13 @@ def run_set(args):
 
 
 def run_list(args):
-    cache = Cache()
+    cache = Cache(cache_dir=args.cache_dir)
     for k, v in cache.items():
         print('{}: {} ({})'.format(k, v['name'], len(v['deprecated'])))
 
 
 def run_clear(args):
-    cache = Cache()
+    cache = Cache(cache_dir=args.cache_dir)
     nb_cleared = cache.clear()
     print('Cache cleared, {} element{} removed.'.format(nb_cleared, 's' *
                                                         (nb_cleared > 1)))
@@ -288,7 +292,7 @@ def run_clear(args):
 def run_docparse(args):
     deprecated = docparse(args.input, args.pattern)
 
-    cache = Cache()
+    cache = Cache(cache_dir=args.cache_dir)
     if args.recursive:
         key_factory = RecursiveCacheKeyFactory()
     else:
@@ -310,6 +314,11 @@ def run():
     parser = argparse.ArgumentParser(
         description='Interact with memestra cache')
     subparsers = parser.add_subparsers()
+
+    parser.add_argument('--cache-dir', dest='cache_dir',
+                        default=None,
+                        action='store',
+                        help='The directory where the cache is located')
 
     parser_set = subparsers.add_parser('set', help='Set a cache entry')
     parser_set.add_argument('--deprecated', dest='deprecated',

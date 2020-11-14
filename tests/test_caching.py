@@ -20,6 +20,15 @@ class TestCaching(TestCase):
         finally:
             shutil.rmtree(tmpdir)
 
+    def test_cache_dir(self):
+        tmpdir = tempfile.mkdtemp()
+        cachedir = os.path.join(tmpdir, "memestra-test")
+        try:
+            cache = memestra.caching.Cache(cache_dir=cachedir)
+            self.assertTrue(os.path.isdir(cachedir))
+        finally:
+            shutil.rmtree(tmpdir)
+
     def test_contains(self):
         tmpdir = tempfile.mkdtemp()
         try:
@@ -117,3 +126,33 @@ class TestCLI(TestCase):
         key = memestra.caching.CacheKeyFactory()(tmppy.name)
         os.remove(tmppy.name)
         self.assertEqual(cache[key], expected)
+
+    def test_cache_dir(self):
+        with tempfile.NamedTemporaryFile(suffix='.py', delete=False) as tmppy:
+            code = '''
+                def foo()
+                    pass
+
+                foo()'''
+
+            tmppy.write(dedent(code).encode())
+
+        try:
+            tmpdir = tempfile.mkdtemp()
+            ref = ''
+            set_args = ['memestra-cache',
+                        '--cache-dir=' + tmpdir,
+                        'set',
+                        '--deprecated=foo',
+                        tmppy.name]
+            with mock.patch.object(sys, 'argv', set_args):
+                from memestra.caching import run
+                run()
+
+            key = memestra.caching.CacheKeyFactory()(tmppy.name)
+            cachefile = os.path.join(tmpdir, key.module_hash)
+            self.assertTrue(os.path.isfile(cachefile))
+        finally:
+            os.remove(tmppy.name)
+            shutil.rmtree(tmpdir)
+
