@@ -6,6 +6,7 @@ import os
 import sys
 import warnings
 
+from importlib.util import resolve_name
 from collections import defaultdict
 from memestra.caching import Cache, CacheKeyFactory, RecursiveCacheKeyFactory
 from memestra.caching import Format
@@ -40,7 +41,8 @@ class SilentDefUseChains(beniget.DefUseChains):
 class ImportResolver(ast.NodeVisitor):
 
     def __init__(self, decorator, reason_keyword, file_path=None,
-                 recursive=False, parent=None, cache_dir=None):
+                 recursive=False, parent=None, module_name="",
+                 cache_dir=None):
         '''
         Create an ImportResolver that finds deprecated identifiers.
 
@@ -57,6 +59,7 @@ class ImportResolver(ast.NodeVisitor):
         self.file_path = file_path
         self.recursive = recursive
         self.reason_keyword = reason_keyword
+        self.module_name = module_name
         if parent:
             self.cache = parent.cache
             self.visited = parent.visited
@@ -70,7 +73,8 @@ class ImportResolver(ast.NodeVisitor):
                 self.key_factory = CacheKeyFactory()
 
     def load_deprecated_from_module(self, module_name):
-        module_path = resolve_module(module_name, self.file_path)
+        module_name = resolve_name(module_name, self.module_name)
+        module_path, _ = resolve_module(module_name)
 
         if module_path is None:
             return None
@@ -107,7 +111,8 @@ class ImportResolver(ast.NodeVisitor):
                                           self.reason_keyword,
                                           self.file_path,
                                           self.recursive,
-                                          parent=self)
+                                          parent=self,
+                                          module_name=module_name)
                 resolver.visit(module)
                 deprecated_imports = [make_deprecated(d, reason)
                                       for _, _, d, reason in
@@ -150,8 +155,9 @@ class ImportResolver(ast.NodeVisitor):
                         reason = deprecated[parent.attr]
                         self.deprecated.add(make_deprecated(parent, reason))
 
-    # FIXME: handle relative imports
     def visit_ImportFrom(self, node):
+        if node.module is None:
+            return None
         deprecated = self.load_deprecated_from_module(node.module)
         if deprecated is None:
             return
@@ -205,7 +211,12 @@ class ImportResolver(ast.NodeVisitor):
             # becomes `foo.bar` instead of just `bar`.
             alias_parent = ancestors.parents(dnode)[-1]
             if isinstance(alias_parent, ast.ImportFrom):
-                original_path = tuple(alias_parent.module.split('.')) + original_path
+                module = "."
+                # A module can be None if a relative import from "." occurs
+                if alias_parent.module is not None:
+                    module = resolve_name(alias_parent.module, self.module_name)
+
+                original_path = tuple(module.split('.')) + original_path
 
             nbterms = len(original_path)
 

@@ -20,7 +20,7 @@ class DependenciesResolver(ast.NodeVisitor):
         self.result = set()
 
     def add_module(self, module_name):
-        module_path = resolve_module(module_name)
+        module_path, _ = resolve_module(module_name)
         if module_path is not None:
             self.result.add(module_path)
 
