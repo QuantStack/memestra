@@ -3,12 +3,12 @@ import sys
 from importlib import util
 from importlib.abc import SourceLoader
 
-def resolve_module(module_name):
+def resolve_module(module_name, additional_search_paths=[]):
     if module_name is None or module_name == "__main__":
         return None, None
 
     parent, _, module_name = module_name.rpartition(".")
-    search_path = None
+    search_path = sys.path + additional_search_paths
 
     if parent != "":
         parent_spec, search_path = resolve_module(parent)

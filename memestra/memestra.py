@@ -40,7 +40,7 @@ class SilentDefUseChains(beniget.DefUseChains):
 
 class ImportResolver(ast.NodeVisitor):
 
-    def __init__(self, decorator, reason_keyword, file_path=None,
+    def __init__(self, decorator, reason_keyword, search_paths=None,
                  recursive=False, parent=None, module_name="",
                  cache_dir=None):
         '''
@@ -56,7 +56,7 @@ class ImportResolver(ast.NodeVisitor):
         '''
         self.deprecated = None
         self.decorator = tuple(decorator)
-        self.file_path = file_path
+        self.search_paths = search_paths
         self.recursive = recursive
         self.reason_keyword = reason_keyword
         self.module_name = module_name
@@ -74,7 +74,7 @@ class ImportResolver(ast.NodeVisitor):
 
     def load_deprecated_from_module(self, module_name):
         module_name = resolve_name(module_name, self.module_name)
-        module_path, _ = resolve_module(module_name)
+        module_path, _ = resolve_module(module_name, self.search_paths)
 
         if module_path is None:
             return None
@@ -109,7 +109,7 @@ class ImportResolver(ast.NodeVisitor):
                 self.visited.add(module_path)
                 resolver = ImportResolver(self.decorator,
                                           self.reason_keyword,
-                                          self.file_path,
+                                          self.search_paths,
                                           self.recursive,
                                           parent=self,
                                           module_name=module_name)
@@ -273,7 +273,7 @@ def prettyname(node):
 
 
 def memestra(file_descriptor, decorator, reason_keyword,
-             file_path=None, recursive=False, cache_dir=None):
+             search_paths=None, recursive=False, cache_dir=None):
     '''
     Parse `file_descriptor` and returns a list of
     (function, filename, line, colno) tuples. Each elements
@@ -292,7 +292,7 @@ def memestra(file_descriptor, decorator, reason_keyword,
 
     module = ast.parse(file_descriptor.read())
     # Collect deprecated functions
-    resolver = ImportResolver(decorator, reason_keyword, file_path,
+    resolver = ImportResolver(decorator, reason_keyword, search_paths,
                               recursive, cache_dir=cache_dir)
     resolver.visit(module)
 
@@ -342,10 +342,14 @@ def run():
 
     _, extension = os.path.splitext(args.input.name)
 
+    # Add the directory of the python file to the list of import paths
+    # to search.
+    search_paths = [os.path.dirname(os.path.abspath(args.input.name))]
+
     deprecate_uses = dispatcher[extension](args.input,
                                            args.decorator.split('.'),
                                            args.reason_keyword,
-                                           args.input.name,
+                                           search_paths,
                                            args.recursive,
                                            args.cache_dir)
 
