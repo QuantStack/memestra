@@ -13,6 +13,9 @@ from memestra.utils import resolve_module
 
 _defs = ast.AsyncFunctionDef, ast.ClassDef, ast.FunctionDef
 
+def symbol_name(sym):
+    return getattr(sym, 'asname', None) or sym.name
+
 def make_deprecated(node, reason=None):
     return (node, reason)
 
@@ -90,6 +93,10 @@ class ImportResolver(ast.NodeVisitor):
                             module_key.module_hash))
                 return {}
 
+        # To avoid loop, mark the key as in process
+        self.cache[module_key] = {'generator': 'manual',
+                                  'deprecated': []}
+
         with open(module_path) as fd:
             try:
                 module = ast.parse(fd.read())
@@ -116,7 +123,7 @@ class ImportResolver(ast.NodeVisitor):
                 deprecated_imports = []
             deprecated = self.collect_deprecated(module, duc, anc)
             deprecated.update(deprecated_imports)
-            dl = {d[0].name: d[1] for d in deprecated if d is not None}
+            dl = {symbol_name(d[0]): d[1] for d in deprecated if d is not None}
             data = {'generator': 'memestra',
                     'deprecated': [store_deprecated(d, dl[d]) for d in
                                    sorted(dl)]}
@@ -126,13 +133,21 @@ class ImportResolver(ast.NodeVisitor):
     def get_deprecated_users(self, defuse, ancestors):
         deprecated_uses = []
         for deprecated_node, reason in self.deprecated:
+
+            if isinstance(deprecated_node, ast.alias):
+                deprecated_uses.append((deprecated_node,
+                                        ancestors.parent(deprecated_node),
+                                        deprecated_node, reason))
+                continue
+
+
             for user in defuse.chains[deprecated_node].users():
                 user_ancestors = [n
                                   for n in ancestors.parents(user.node)
                                   if isinstance(n, _defs)]
                 if any(f in self.deprecated for f in user_ancestors):
                     continue
-                deprecated_uses.append((deprecated_node, user,
+                deprecated_uses.append((deprecated_node, user.node,
                                         user_ancestors[-1] if user_ancestors
                                         else user.node, reason))
         return deprecated_uses
@@ -230,6 +245,28 @@ class ImportResolver(ast.NodeVisitor):
                     self.extract_decorator_from_parents(
                         parents,
                         deprecated)
+
+
+        if not self.recursive:
+            return deprecated
+
+        # In recursive mode, we consider deprecated any imported
+        # deprecated symbol.
+        for dlocal in duc.locals[node]:
+            dnode = dlocal.node
+            if not isinstance(dnode, ast.alias):
+                continue
+            alias_parent = ancestors.parents(dnode)[-1]
+            if isinstance(alias_parent, ast.ImportFrom):
+                imported_deprecated = self.load_deprecated_from_module(
+                    alias_parent.module)
+                if not imported_deprecated:
+                    continue
+                if dnode.name in imported_deprecated:
+                    dinfo = make_deprecated(dnode,
+                                            imported_deprecated[dnode.name])
+                    deprecated.add(dinfo)
+
         return deprecated
 
     def extract_decorator_from_parents(self, parents, deprecated):
@@ -254,6 +291,8 @@ class ImportResolver(ast.NodeVisitor):
 def prettyname(node):
     if isinstance(node, _defs):
         return node.name
+    if isinstance(node, ast.alias):
+        return node.asname or node.name
     if isinstance(node, ast.Name):
         return node.id
     if isinstance(node, ast.Attribute):
@@ -290,11 +329,12 @@ def memestra(file_descriptor, decorator, reason_keyword,
 
     # Find their users
     formated_deprecated = []
-    for deprecated_node, user, _, reason in resolver.get_deprecated_users(duc, ancestors):
+    for deprecated_info in resolver.get_deprecated_users(duc, ancestors):
+        deprecated_node, user_node, _, reason = deprecated_info
         formated_deprecated.append((prettyname(deprecated_node),
                                getattr(file_descriptor, 'name', '<>'),
-                               user.node.lineno,
-                               user.node.col_offset,
+                               user_node.lineno,
+                               user_node.col_offset,
                                reason))
     formated_deprecated.sort()
     return formated_deprecated
