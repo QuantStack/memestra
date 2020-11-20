@@ -108,7 +108,9 @@ class TestRecImports(TestCase):
 
         self.checkDeprecatedUses(
             code,
-            [('foo', '<>', 5, 4, None), ('foo', '<>', 7, 0, None)])
+            [('foo', '<>', 2, 0, None),
+             ('foo', '<>', 5, 4, None),
+             ('foo', '<>', 7, 0, None)])
 
     def test_import_from1(self):
         code = '''
@@ -122,3 +124,31 @@ class TestRecImports(TestCase):
         self.checkDeprecatedUses(
             code,
             [])
+
+    def test_forwarding_symbol0(self):
+        code = '''
+            from module_forwarding_symbol import Test
+            t = Test()'''
+
+        self.checkDeprecatedUses(
+            code,
+            [('Test', '<>', 2, 0, None), ('Test', '<>', 3, 4, None)])
+
+    def test_forwarding_symbol1(self):
+        code = '''
+            import module_forwarding_symbol
+            t = module_forwarding_symbol.Test()'''
+
+        self.checkDeprecatedUses(
+            code,
+            [('module_forwarding_symbol.Test', '<>', 3, 4, None)])
+
+    def test_forwarding_symbol2(self):
+        code = '''
+            from module_forwarding_symbol import Testosterone
+            t = Testosterone()'''
+
+        self.checkDeprecatedUses(
+            code,
+            [('Testosterone', '<>', 2, 0, None),
+             ('Testosterone', '<>', 3, 4, None)])
