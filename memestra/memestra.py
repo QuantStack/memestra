@@ -1,11 +1,10 @@
-#if reason is None and there is a string there then show the string as a reson
-
 import beniget
 import gast as ast
 import os
 import sys
 import warnings
 
+from importlib.util import resolve_name
 from collections import defaultdict
 from memestra.caching import Cache, CacheKeyFactory, RecursiveCacheKeyFactory
 from memestra.caching import Format
@@ -42,8 +41,9 @@ class SilentDefUseChains(beniget.DefUseChains):
 
 class ImportResolver(ast.NodeVisitor):
 
-    def __init__(self, decorator, reason_keyword, file_path=None,
-                 recursive=False, parent=None, cache_dir=None):
+    def __init__(self, decorator, reason_keyword, search_paths=None,
+                 recursive=False, parent=None, pkg_name="",
+                 cache_dir=None):
         '''
         Create an ImportResolver that finds deprecated identifiers.
 
@@ -57,9 +57,10 @@ class ImportResolver(ast.NodeVisitor):
         '''
         self.deprecated = None
         self.decorator = tuple(decorator)
-        self.file_path = file_path
+        self.search_paths = search_paths
         self.recursive = recursive
         self.reason_keyword = reason_keyword
+        self.pkg_name = pkg_name
         if parent:
             self.cache = parent.cache
             self.visited = parent.visited
@@ -72,14 +73,31 @@ class ImportResolver(ast.NodeVisitor):
             else:
                 self.key_factory = CacheKeyFactory()
 
-    def load_deprecated_from_module(self, module_name):
-        module_path = resolve_module(module_name, self.file_path)
+    def load_deprecated_from_module(self, module_name, level=None):
+        # level may be none when it's taken from the ImportFrom node
+        if level is None:
+            level = 0
 
+        # update module/pkg based on level
+        rmodule_name = '.' * level + module_name
+
+        # drop current submodule name
+        pkg = ".".join(self.pkg_name.split('.')[:-1])
+
+        # perform the module lookup
+        try:
+            module_name = resolve_name(rmodule_name, pkg)
+        except (ImportError, ValueError):
+            return None
+        module_path = resolve_module(module_name, self.search_paths)
+
+        # hopefully a module was found
         if module_path is None:
             return None
 
         module_key = self.key_factory(module_path)
 
+        # either find it in the cache
         if module_key in self.cache:
             data = self.cache[module_key]
             if data['version'] == Format.version:
@@ -92,6 +110,8 @@ class ImportResolver(ast.NodeVisitor):
                     .format(module_name,
                             module_key.module_hash))
                 return {}
+
+        # or fill a new entry
 
         # To avoid loop, mark the key as in process
         self.cache[module_key] = {'generator': 'manual',
@@ -112,9 +132,10 @@ class ImportResolver(ast.NodeVisitor):
                 self.visited.add(module_path)
                 resolver = ImportResolver(self.decorator,
                                           self.reason_keyword,
-                                          self.file_path,
+                                          self.search_paths,
                                           self.recursive,
-                                          parent=self)
+                                          parent=self,
+                                          pkg_name=module_name)
                 resolver.visit(module)
                 deprecated_imports = [make_deprecated(d, reason)
                                       for _, _, d, reason in
@@ -165,9 +186,11 @@ class ImportResolver(ast.NodeVisitor):
                         reason = deprecated[parent.attr]
                         self.deprecated.add(make_deprecated(parent, reason))
 
-    # FIXME: handle relative imports
     def visit_ImportFrom(self, node):
-        deprecated = self.load_deprecated_from_module(node.module)
+        if node.module is None:
+            return None
+        deprecated = self.load_deprecated_from_module(node.module,
+                                                      level=node.level)
         if deprecated is None:
             return
 
@@ -220,7 +243,12 @@ class ImportResolver(ast.NodeVisitor):
             # becomes `foo.bar` instead of just `bar`.
             alias_parent = ancestors.parents(dnode)[-1]
             if isinstance(alias_parent, ast.ImportFrom):
-                original_path = tuple(alias_parent.module.split('.')) + original_path
+                module = "."
+                # A module can be None if a relative import from "." occurs
+                if alias_parent.module is not None:
+                    module = resolve_name(alias_parent.module, self.pkg_name)
+
+                original_path = tuple(module.split('.')) + original_path
 
             nbterms = len(original_path)
 
@@ -258,8 +286,11 @@ class ImportResolver(ast.NodeVisitor):
                 continue
             alias_parent = ancestors.parents(dnode)[-1]
             if isinstance(alias_parent, ast.ImportFrom):
+                if not alias_parent.module:
+                    continue
                 imported_deprecated = self.load_deprecated_from_module(
-                    alias_parent.module)
+                    alias_parent.module,
+                    level=alias_parent.level)
                 if not imported_deprecated:
                     continue
                 if dnode.name in imported_deprecated:
@@ -295,13 +326,15 @@ def prettyname(node):
         return node.asname or node.name
     if isinstance(node, ast.Name):
         return node.id
+    if isinstance(node, ast.alias):
+        return node.asname or node.name
     if isinstance(node, ast.Attribute):
         return prettyname(node.value) + '.' + node.attr
     return repr(node)
 
 
 def memestra(file_descriptor, decorator, reason_keyword,
-             file_path=None, recursive=False, cache_dir=None):
+             search_paths=None, recursive=False, cache_dir=None):
     '''
     Parse `file_descriptor` and returns a list of
     (function, filename, line, colno) tuples. Each elements
@@ -320,7 +353,7 @@ def memestra(file_descriptor, decorator, reason_keyword,
 
     module = ast.parse(file_descriptor.read())
     # Collect deprecated functions
-    resolver = ImportResolver(decorator, reason_keyword, file_path,
+    resolver = ImportResolver(decorator, reason_keyword, search_paths,
                               recursive, cache_dir=cache_dir)
     resolver.visit(module)
 
@@ -371,10 +404,14 @@ def run():
 
     _, extension = os.path.splitext(args.input.name)
 
+    # Add the directory of the python file to the list of import paths
+    # to search.
+    search_paths = [os.path.dirname(os.path.abspath(args.input.name))]
+
     deprecate_uses = dispatcher[extension](args.input,
                                            args.decorator.split('.'),
                                            args.reason_keyword,
-                                           args.input.name,
+                                           search_paths,
                                            args.recursive,
                                            args.cache_dir)
 

@@ -5,14 +5,15 @@ import memestra
 
 import os
 import sys
-TESTS_FAKE_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), 'misc', 'test.py'))
+
+TESTS_PATHS = [os.path.abspath(os.path.join(os.path.dirname(__file__), 'misc'))]
 
 class TestImports(TestCase):
 
     def checkDeprecatedUses(self, code, expected_output):
         sio = StringIO(dedent(code))
         output = memestra.memestra(sio, ('decoratortest', 'deprecated'), None,
-                                    file_path=TESTS_FAKE_FILE)
+                                   search_paths=TESTS_PATHS)
         self.assertEqual(output, expected_output)
 
     def test_import_from(self):
@@ -79,7 +80,7 @@ class TestRecImports(TestCase):
     def checkDeprecatedUses(self, code, expected_output):
         sio = StringIO(dedent(code))
         output = memestra.memestra(sio, ('decoratortest', 'deprecated'), None,
-                                   file_path=TESTS_FAKE_FILE, recursive=True)
+                                   search_paths=TESTS_PATHS, recursive=True)
         self.assertEqual(output, expected_output)
 
     def test_import(self):
@@ -152,3 +153,45 @@ class TestRecImports(TestCase):
             code,
             [('Testosterone', '<>', 2, 0, None),
              ('Testosterone', '<>', 3, 4, None)])
+
+    def test_importing_non_existing_file(self):
+        code = '''
+            from phantom import void, empty
+            void()
+            empty()'''
+
+        self.checkDeprecatedUses(
+            code,
+            [('empty', '<>', 2, 0, None),
+             ('empty', '<>', 4, 0, None)])
+
+
+class TestImportPkg(TestCase):
+
+    def checkDeprecatedUses(self, code, expected_output):
+        sio = StringIO(dedent(code))
+        output = memestra.memestra(sio, ('decoratortest', 'deprecated'), None,
+                                   search_paths=TESTS_PATHS, recursive=True)
+        self.assertEqual(output, expected_output)
+
+    def test_import_pkg(self):
+        code = '''
+            import pkg
+
+            def foobar():
+                pkg.test()'''
+
+        self.checkDeprecatedUses(
+            code,
+            [('pkg.test', '<>', 5, 4, None)])
+
+    def test_import_pkg_level(self):
+        code = '''
+            from pkg.sub.other import other
+
+            def foobar():
+                other()'''
+
+        self.checkDeprecatedUses(
+            code,
+            [('other', '<>', 2, 0, None), ('other', '<>', 5, 4, None)])

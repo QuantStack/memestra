@@ -2,9 +2,10 @@ from memestra import memestra
 from io import StringIO
 from collections import namedtuple
 import nbformat
+import os
 
 
-def nbmemestra_from_nbnode(nb, decorator, filepath, reason_keyword='reason'):
+def nbmemestra_from_nbnode(nb, decorator, search_paths=None, reason_keyword='reason'):
     # Get code cells
     cells = nb.cells
     code_cells = [c for c in cells if c['cell_type'] == 'code']
@@ -22,7 +23,8 @@ def nbmemestra_from_nbnode(nb, decorator, filepath, reason_keyword='reason'):
     code = '\n'.join(code_list)
 
     # Collect calls to deprecated functions
-    deprecated_list = memestra(StringIO(code), decorator, reason_keyword, filepath)
+    deprecated_list = memestra(StringIO(code), decorator, reason_keyword,
+                               search_paths)
 
     # Map them to cells
     result = []
@@ -35,9 +37,10 @@ def nbmemestra_from_nbnode(nb, decorator, filepath, reason_keyword='reason'):
     return result
 
 
-def nbmemestra(nbfile, decorator, filepath, reason_keyword='reason'):
+def nbmemestra(nbfile, decorator, reason_keyword='reason'):
     nb = nbformat.read(nbfile, 4)
-    return nbmemestra_from_nbnode(nb, decorator, filepath, reason_keyword)
+    return nbmemestra_from_nbnode(nb, decorator,
+                                  [os.path.dirname(nbfile)], reason_keyword)
 
 
 def register(dispatcher):
