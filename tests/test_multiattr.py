@@ -5,14 +5,15 @@ import memestra
 
 import os
 import sys
-TESTS_FAKE_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), 'misc', 'test.py'))
+
+TESTS_PATHS = [os.path.abspath(os.path.join(os.path.dirname(__file__), 'misc'))]
 
 class TestMultiAttr(TestCase):
 
     def checkDeprecatedUses(self, code, expected_output):
         sio = StringIO(dedent(code))
         output = memestra.memestra(sio, ('decorator', 'sub', 'deprecated'), None,
-                                    file_path=TESTS_FAKE_FILE)
+                                   search_paths=TESTS_PATHS)
         self.assertEqual(output, expected_output)
 
     def test_import(self):
