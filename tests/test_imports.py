@@ -154,6 +154,26 @@ class TestRecImports(TestCase):
             [('Testosterone', '<>', 2, 0, None),
              ('Testosterone', '<>', 3, 4, None)])
 
+    def test_forwarding_all_symbols1(self):
+        code = '''
+            from module_forwarding_all_symbols import Test
+            t = Test()'''
+
+        self.checkDeprecatedUses(
+            code,
+            [('Test', '<>', 2, 0, None),
+             ('Test', '<>', 3, 4, None)])
+
+    def test_forwarding_all_symbols2(self):
+        code = '''
+            from module_forwarding_all_symbols import *
+            t = Test()'''
+
+        self.checkDeprecatedUses(
+            code,
+            [('*', '<>', 3, 4, None),
+             ('Test', '<>', 3, 4, None)])
+
     def test_importing_non_existing_file(self):
         code = '''
             from phantom import void, empty

@@ -12,6 +12,14 @@ from memestra.utils import resolve_module
 
 _defs = ast.AsyncFunctionDef, ast.ClassDef, ast.FunctionDef
 
+class DeprecatedStar(object):
+    'Representation of a deprecated node imported through *'
+
+    def __init__(self, name, dnode):
+        assert dnode.name == '*'
+        self.name = name
+        self.dnode = dnode
+
 def symbol_name(sym):
     return getattr(sym, 'asname', None) or sym.name
 
@@ -154,23 +162,36 @@ class ImportResolver(ast.NodeVisitor):
     def get_deprecated_users(self, defuse, ancestors):
         deprecated_uses = []
         for deprecated_node, reason in self.deprecated:
-
+            # special node: an imported name
             if isinstance(deprecated_node, ast.alias):
                 deprecated_uses.append((deprecated_node,
                                         ancestors.parent(deprecated_node),
                                         deprecated_node, reason))
-                continue
 
+            else:
+                # special node: a node imported from *; in that case we do
+                # selective matching
+                if isinstance(deprecated_node, DeprecatedStar):
+                    def filter_out(user):
+                        return user.name() != deprecated_node.name
+                    deprecated = deprecated_node.dnode
+                # regular symbol processing
+                else:
+                    def filter_out(user):
+                        return False
+                    deprecated = deprecated_node
 
-            for user in defuse.chains[deprecated_node].users():
-                user_ancestors = [n
-                                  for n in ancestors.parents(user.node)
-                                  if isinstance(n, _defs)]
-                if any(f in self.deprecated for f in user_ancestors):
-                    continue
-                deprecated_uses.append((deprecated_node, user.node,
-                                        user_ancestors[-1] if user_ancestors
-                                        else user.node, reason))
+                for user in defuse.chains[deprecated].users():
+                    if filter_out(user):
+                        continue
+                    user_ancestors = [n
+                                      for n in ancestors.parents(user.node)
+                                      if isinstance(n, _defs)]
+                    if any(f in self.deprecated for f in user_ancestors):
+                        continue
+                    deprecated_uses.append((deprecated, user.node,
+                                            user_ancestors[-1] if user_ancestors
+                                            else user.node, reason))
         return deprecated_uses
 
     def visit_Import(self, node):
@@ -196,14 +217,32 @@ class ImportResolver(ast.NodeVisitor):
 
         aliases = [alias.name for alias in node.names]
 
+        try:
+            # if we're importing *, pick all deprecated items
+            star_alias_index = aliases.index('*')
+            star_alias = node.names[star_alias_index]
+
+            def alias_extractor(deprec):
+                return star_alias
+
+        except ValueError:
+            # otherwise only pick the imported one
+
+            def alias_extractor(deprec):
+                try:
+                    index = aliases.index(deprec)
+                    alias = node.names[index]
+                    return alias
+                except ValueError:
+                    return None
+
         for deprec, reason in deprecated.items():
-            try:
-                index = aliases.index(deprec)
-                alias = node.names[index]
-                for user in self.def_use_chains.chains[alias].users():
-                    self.deprecated.add(make_deprecated(user.node, reason))
-            except ValueError:
+            deprec_alias = alias_extractor(deprec)
+            if deprec_alias is None:
                 continue
+
+            for user in self.def_use_chains.chains[deprec_alias].users():
+                self.deprecated.add(make_deprecated(user.node, reason))
 
     def visit_Module(self, node):
         duc = SilentDefUseChains()
@@ -297,6 +336,11 @@ class ImportResolver(ast.NodeVisitor):
                     dinfo = make_deprecated(dnode,
                                             imported_deprecated[dnode.name])
                     deprecated.add(dinfo)
+                elif dnode.name == '*':
+                    for name, reason in imported_deprecated.items():
+                        dinfo = make_deprecated(DeprecatedStar(name, dnode),
+                                                reason)
+                        deprecated.add(dinfo)
 
         return deprecated
 
