@@ -215,3 +215,13 @@ class TestImportPkg(TestCase):
         self.checkDeprecatedUses(
             code,
             [('other', '<>', 2, 0, None), ('other', '<>', 5, 4, None)])
+
+    def test_import_pkg_level_star(self):
+        code = '''
+            from ipy import foo
+
+            b = foo()'''
+
+        self.checkDeprecatedUses(
+            code,
+            [('foo', '<>', 2, 0, 'why'), ('foo', '<>', 4, 4, 'why')])
