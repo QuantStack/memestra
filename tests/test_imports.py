@@ -126,6 +126,16 @@ class TestRecImports(TestCase):
             code,
             [])
 
+    def test_import_from2(self):
+        code = '''
+            from some_rec_module import foobar
+
+            foobar()'''
+
+        self.checkDeprecatedUses(
+            code,
+            [('foobar', '<>', 2, 0, None), ('foobar', '<>', 4, 0, None)])
+
     def test_forwarding_symbol0(self):
         code = '''
             from module_forwarding_symbol import Test

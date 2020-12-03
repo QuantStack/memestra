@@ -5,3 +5,6 @@ def foo():
 
 def bar():
     return some_module.bar()
+
+def foobar():
+    return foo(), bar()

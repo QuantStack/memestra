@@ -21,7 +21,13 @@ class DeprecatedStar(object):
         self.dnode = dnode
 
 def symbol_name(sym):
-    return getattr(sym, 'asname', None) or sym.name
+    if getattr(sym, 'asname', None):
+        return sym.asname
+    if hasattr(sym, 'name'):
+        return sym.name
+    if hasattr(sym, 'id'):
+        return sym.id
+    raise NotImplementedError(sym)
 
 def make_deprecated(node, reason=None):
     return (node, reason)
@@ -160,7 +166,14 @@ class ImportResolver(ast.NodeVisitor):
 
     def get_deprecated_users(self, defuse, ancestors):
         deprecated_uses = []
-        for deprecated_node, reason in self.deprecated:
+        visited = set()
+        worklist = list(self.deprecated)
+        while worklist:
+            deprecated_node, reason = worklist.pop()
+            if deprecated_node in visited:
+                continue
+            visited.add(deprecated_node)
+
             # special node: an imported name
             if isinstance(deprecated_node, ast.alias):
                 deprecated_uses.append((deprecated_node,
@@ -188,9 +201,13 @@ class ImportResolver(ast.NodeVisitor):
                                       if isinstance(n, _defs)]
                     if any(f in self.deprecated for f in user_ancestors):
                         continue
+
+                    user_ancestor = user_ancestors[-1] if user_ancestors else user.node
                     deprecated_uses.append((deprecated, user.node,
-                                            user_ancestors[-1] if user_ancestors
-                                            else user.node, reason))
+                                            user_ancestor,
+                                            reason))
+                    if self.recursive and isinstance(user_ancestor, _defs):
+                        worklist.append((user_ancestor, reason))
         return deprecated_uses
 
     def visit_Import(self, node):
