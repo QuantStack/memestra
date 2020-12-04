@@ -50,7 +50,7 @@ class SilentDefUseChains(beniget.DefUseChains):
 class ImportResolver(ast.NodeVisitor):
 
     def __init__(self, decorator, reason_keyword, search_paths=None,
-                 recursive=False, parent=None, pkg_name="",
+                 recursive=False, parent=None, pkg_name=None,
                  cache_dir=None):
         '''
         Create an ImportResolver that finds deprecated identifiers.
@@ -89,12 +89,9 @@ class ImportResolver(ast.NodeVisitor):
         # update module/pkg based on level
         rmodule_name = '.' * level + module_name
 
-        # drop current submodule name
-        pkg = ".".join(self.pkg_name.split('.')[:-1])
-
         # perform the module lookup
         try:
-            module_name = resolve_name(rmodule_name, pkg)
+            module_name = resolve_name(rmodule_name, self.pkg_name)
         except (ImportError, ValueError):
             return None
         module_path = resolve_module(module_name, self.search_paths)
@@ -138,19 +135,21 @@ class ImportResolver(ast.NodeVisitor):
             # Collect deprecated functions
             if self.recursive and module_path not in self.visited:
                 self.visited.add(module_path)
+                current_pkg = ".".join(module_name.split('.')[:-1])
                 resolver = ImportResolver(self.decorator,
                                           self.reason_keyword,
                                           self.search_paths,
                                           self.recursive,
                                           parent=self,
-                                          pkg_name=module_name)
+                                          pkg_name=current_pkg)
                 resolver.visit(module)
                 deprecated_imports = [make_deprecated(d, reason)
                                       for _, _, d, reason in
                                       resolver.get_deprecated_users(duc, anc)]
             else:
                 deprecated_imports = []
-            deprecated = self.collect_deprecated(module, duc, anc)
+            deprecated = self.collect_deprecated(module, duc, anc,
+                                                 pkg_name=module_name)
             deprecated.update(deprecated_imports)
             dl = {symbol_name(d[0]): d[1] for d in deprecated if d is not None}
             data = {'generator': 'memestra',
@@ -256,7 +255,7 @@ class ImportResolver(ast.NodeVisitor):
         self.deprecated = self.collect_deprecated(node, duc, ancestors)
         self.generic_visit(node)
 
-    def collect_deprecated(self, node, duc, ancestors):
+    def collect_deprecated(self, node, duc, ancestors, pkg_name=None):
         deprecated = set()
 
         for dlocal in duc.locals[node]:
@@ -327,7 +326,14 @@ class ImportResolver(ast.NodeVisitor):
             if isinstance(alias_parent, ast.ImportFrom):
                 if not alias_parent.module:
                     continue
-                imported_deprecated = self.load_deprecated_from_module(
+                resolver = ImportResolver(self.decorator,
+                                          self.reason_keyword,
+                                          self.search_paths,
+                                          self.recursive,
+                                          self,
+                                          pkg_name)
+
+                imported_deprecated = resolver.load_deprecated_from_module(
                     alias_parent.module,
                     level=alias_parent.level)
                 if not imported_deprecated:
