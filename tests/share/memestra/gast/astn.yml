@@ -1,0 +1,4 @@
+deprecated: ['AstToGAst:because']
+generator: manual
+name: gast.astn
+version: 1

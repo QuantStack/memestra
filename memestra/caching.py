@@ -1,5 +1,6 @@
 import os
 import hashlib
+import sys
 import yaml
 
 # not using gast because we only rely on Import and ImportFrom, which are
@@ -131,12 +132,15 @@ class CacheKeyFactoryBase(object):
         self.keycls = keycls
         self.created = dict()
 
-    def __call__(self, module_path):
+    def __call__(self, module_path, name_hint=None ):
         if module_path in self.created:
             return self.created[module_path]
         else:
             self.created[module_path] = None  # creation in process
             key = self.keycls(module_path, self)
+            if name_hint is None:
+                name_hint = os.path.splitext(os.path.basename(module_path))[0]
+            key.name = name_hint
             self.created[module_path] = key
             return key
 
@@ -153,11 +157,15 @@ class CacheKeyFactory(CacheKeyFactoryBase):
     class CacheKey(object):
 
         def __init__(self, module_path, _):
-            self.name, _ = os.path.splitext(os.path.basename(module_path))
+
             with open(module_path, 'rb') as fd:
                 module_content = fd.read()
                 module_hash = hashlib.sha256(module_content).hexdigest()
                 self.module_hash = module_hash
+
+        @property
+        def path(self):
+            return self.name.replace('.', os.path.sep)
 
     def __init__(self):
         super(CacheKeyFactory, self).__init__(CacheKeyFactory.CacheKey)
@@ -176,7 +184,6 @@ class RecursiveCacheKeyFactory(CacheKeyFactoryBase):
         def __init__(self, module_path, factory):
             assert module_path not in factory.created or factory.created[module_path] is None
 
-            self.name, _ = os.path.splitext(os.path.basename(module_path))
             with open(module_path, 'rb') as fd:
                 module_content = fd.read()
 
@@ -204,13 +211,51 @@ class RecursiveCacheKeyFactory(CacheKeyFactoryBase):
 
                 self.module_hash = hashlib.sha256("".join(hashes).encode("ascii")).hexdigest()
 
+        @property
+        def path(self):
+            return self.name.replace('.', os.path.sep)
+
     def __init__(self):
         super(RecursiveCacheKeyFactory, self).__init__(RecursiveCacheKeyFactory.CacheKey)
+
+
+class SharedCache(object):
+
+    def __init__(self):
+        shared_dir = os.path.join(sys.prefix, 'share', 'memestra')
+        os.makedirs(shared_dir, exist_ok=True)
+        self.cache_entries = {}
+
+        for root, dirs, files in os.walk(shared_dir):
+            for fname in files:
+                if not fname.endswith('.yml'):
+                    continue
+                # Not loading all entries on startup,
+                # doing it lazily upon __getitem__
+
+                if fname == '__init__.yml':
+                    key = root[1 + len(shared_dir):]
+                else:
+                    key = os.path.join(root[1 + len(shared_dir):], fname[:-4])
+                self.cache_entries[key] = os.path.join(root, fname)
+
+    def __contains__(self, key):
+        return key in self.cache_entries
+
+    def __getitem__(self, key):
+        cache_path = self.cache_entries[key]
+        with open(cache_path, 'r') as yaml_fd:
+            return yaml.load(yaml_fd, Loader=yaml.SafeLoader)
+
+    def keys(self):
+        return self.cache_entries.keys()
 
 
 class Cache(object):
 
     def __init__(self, cache_dir=None):
+        self.shared_cache = SharedCache()
+
         if cache_dir is not None:
             self.cachedir = cache_dir
         else:
@@ -223,17 +268,20 @@ class Cache(object):
                 memestra_dir = 'memestra'
             self.cachedir = os.path.expanduser(os.path.join(user_config_dir,
                                                             memestra_dir))
-
         os.makedirs(self.cachedir, exist_ok=True)
 
     def _get_path(self, key):
         return os.path.join(self.cachedir, key.module_hash)
 
     def __contains__(self, key):
+        if key.path in self.shared_cache:
+            return True
         cache_path = self._get_path(key)
         return os.path.isfile(cache_path)
 
     def __getitem__(self, key):
+        if key.path in self.shared_cache:
+            return self.shared_cache[key.path]
         cache_path = self._get_path(key)
         with open(cache_path, 'r') as yaml_fd:
             return yaml.load(yaml_fd, Loader=yaml.SafeLoader)
@@ -254,6 +302,11 @@ class Cache(object):
             cache_path = os.path.join(self.cachedir, key)
             with open(cache_path, 'r') as yaml_fd:
                 yield key, yaml.load(yaml_fd, Loader=yaml.SafeLoader)
+
+
+    def shared_items(self):
+        for key in self.shared_cache.keys():
+            yield key, self.shared_cache[key]
 
     def clear(self):
         count = 0
@@ -278,8 +331,15 @@ def run_set(args):
 
 def run_list(args):
     cache = Cache(cache_dir=args.cache_dir)
-    for k, v in cache.items():
+    print('declarative cache')
+    print('-----------------')
+    for k, v in cache.shared_items():
         print('{}: {} ({})'.format(k, v['name'], len(v['deprecated'])))
+    print()
+    print('automatic cache')
+    print('---------------')
+    for k, v in cache.items():
+        print('{}: {} ({})'.format(k[:16], v['name'], len(v['deprecated'])))
 
 
 def run_clear(args):

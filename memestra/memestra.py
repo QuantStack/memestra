@@ -106,7 +106,7 @@ class ImportResolver(ast.NodeVisitor):
         if module_path is None:
             return None
 
-        module_key = self.key_factory(module_path)
+        module_key = self.key_factory(module_path, name_hint=module_name)
 
         # either find it in the cache
         if module_key in self.cache:
