@@ -1,4 +1,4 @@
-from unittest import TestCase
+from unittest import TestCase, mock
 from textwrap import dedent
 from io import StringIO
 import memestra
@@ -235,3 +235,19 @@ class TestImportPkg(TestCase):
         self.checkDeprecatedUses(
             code,
             [('foo', '<>', 2, 0, 'why'), ('foo', '<>', 4, 4, 'why')])
+
+    def test_shared_cache(self):
+        # We have a fake description for gast in tests/share/memestra
+        # Setup the shared cache to use it.
+        with mock.patch('sys.prefix', os.path.dirname(__file__)):
+            self.checkDeprecatedUses(
+                'from gast import parse',
+                [('parse', '<>', 1, 0, None)])
+
+    def test_shared_cache_sub(self):
+        # We have a fake description for gast in tests/share/memestra
+        # Setup the shared cache to use it.
+        with mock.patch('sys.prefix', os.path.dirname(__file__)):
+            self.checkDeprecatedUses(
+                'from gast.astn import AstToGAst',
+                [('AstToGAst', '<>', 1, 0, 'because')])
