@@ -1,0 +1,42 @@
+name: testing
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+jobs:
+  build:
+    runs-on: ubuntu-18.04
+    strategy:
+      matrix:
+        python-version: [3.6, 3.7, 3.8, 3.9]
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        python --version
+        python -m pip install --upgrade pip
+        wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
+        bash miniconda.sh -b -p $HOME/miniconda
+        source "$HOME/miniconda/etc/profile.d/conda.sh"
+        hash -r
+        conda config --set always_yes yes --set changeps1 no
+        conda update -q conda
+        conda info -a
+        # nbconvert needs pandoc
+        conda create -q -n test-environment -c conda-forge python=${{ matrix.python-version }} pandoc
+        conda activate test-environment
+        pip install -v .[test]
+    - name: Testing
+      run: |
+        source "$HOME/miniconda/etc/profile.d/conda.sh"
+        conda activate test-environment
+        pytest -v
+        pytest -v  # run test twice because the first run populates the cache, so they are not exactly equivalent
