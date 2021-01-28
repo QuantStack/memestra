@@ -181,8 +181,7 @@ class TestRecImports(TestCase):
 
         self.checkDeprecatedUses(
             code,
-            [('*', '<>', 3, 4, None),
-             ('Test', '<>', 3, 4, None)])
+            [('Test', '<>', 3, 4, None)])
 
     def test_importing_non_existing_file(self):
         code = '''
@@ -235,6 +234,16 @@ class TestImportPkg(TestCase):
         self.checkDeprecatedUses(
             code,
             [('foo', '<>', 2, 0, 'why'), ('foo', '<>', 4, 4, 'why')])
+
+    def test_import_pkg_level_star2(self):
+        code = '''
+            from ipy import *
+            a = useless()
+            b = foo()'''
+
+        self.checkDeprecatedUses(
+            code,
+            [('foo', '<>', 4, 4, 'why')])
 
     def test_shared_cache(self):
         # We have a fake description for gast in tests/share/memestra

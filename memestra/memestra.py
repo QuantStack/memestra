@@ -181,21 +181,11 @@ class ImportResolver(ast.NodeVisitor):
                                         deprecated_node, reason))
 
             else:
-                # special node: a node imported from *; in that case we do
-                # selective matching
+                # There's a special handler in ImportFrom for these
                 if isinstance(deprecated_node, DeprecatedStar):
-                    def filter_out(user):
-                        return user.name() != deprecated_node.name
-                    deprecated = deprecated_node.dnode
-                # regular symbol processing
-                else:
-                    def filter_out(user):
-                        return False
-                    deprecated = deprecated_node
+                    continue
 
-                for user in defuse.chains[deprecated].users():
-                    if filter_out(user):
-                        continue
+                for user in defuse.chains[deprecated_node].users():
                     user_ancestors = [n
                                       for n in ancestors.parents(user.node)
                                       if isinstance(n, _defs)]
@@ -203,7 +193,7 @@ class ImportResolver(ast.NodeVisitor):
                         continue
 
                     user_ancestor = user_ancestors[-1] if user_ancestors else user.node
-                    deprecated_uses.append((deprecated, user.node,
+                    deprecated_uses.append((deprecated_node, user.node,
                                             user_ancestor,
                                             reason))
                     if self.recursive and isinstance(user_ancestor, _defs):
@@ -241,6 +231,9 @@ class ImportResolver(ast.NodeVisitor):
             def alias_extractor(deprec):
                 return star_alias
 
+            def alias_selector(deprec, node):
+                return getattr(node, 'id', None) == deprec
+
         except ValueError:
             # otherwise only pick the imported one
 
@@ -252,12 +245,18 @@ class ImportResolver(ast.NodeVisitor):
                 except ValueError:
                     return None
 
+            def alias_selector(deprec, node):
+                return True
+
         for deprec, reason in deprecated.items():
             deprec_alias = alias_extractor(deprec)
             if deprec_alias is None:
                 continue
 
             for user in self.def_use_chains.chains[deprec_alias].users():
+                # if deprec_alias is '*' we need to be selective
+                if not alias_selector(deprec, user.node):
+                    continue
                 self.deprecated.add(make_deprecated(user.node, reason))
 
     def visit_Module(self, node):
