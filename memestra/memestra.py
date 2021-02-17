@@ -9,6 +9,7 @@ from collections import defaultdict
 from memestra.caching import Cache, CacheKeyFactory, RecursiveCacheKeyFactory
 from memestra.caching import Format
 from memestra.utils import resolve_module
+import frilouz
 
 _defs = ast.AsyncFunctionDef, ast.ClassDef, ast.FunctionDef
 
@@ -130,7 +131,7 @@ class ImportResolver(ast.NodeVisitor):
 
         with open(module_path) as fd:
             try:
-                module = ast.parse(fd.read())
+                module, syntax_errors = frilouz.parse(ast.parse, fd.read())
             except UnicodeDecodeError:
                 return []
             duc = SilentDefUseChains()
@@ -417,7 +418,7 @@ def memestra(file_descriptor, decorator, reason_keyword,
     assert not isinstance(decorator, str) and \
            len(decorator) > 1, "decorator is at least (module, attribute)"
 
-    module = ast.parse(file_descriptor.read())
+    module, syntax_errors = frilouz.parse(ast.parse, file_descriptor.read())
     # Collect deprecated functions
     resolver = ImportResolver(decorator, reason_keyword, search_paths,
                               recursive, cache_dir=cache_dir)

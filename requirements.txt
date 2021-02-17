@@ -3,3 +3,4 @@ beniget
 nbformat
 nbconvert
 pyyaml
+frilouz
