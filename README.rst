@@ -14,14 +14,16 @@ https://memestra.readthedocs.io/
 Sample Usages
 -------------
 
-Track usage of functions decorated by ``@decorator.deprecated``:
+Track usage of functions decorated by ``@deprecated.deprecated`` from the
+`deprecated <https://pypi.org/project/Deprecated/>`_ package:
 
 .. code-block:: console
 
+    > pip install deprecated
     > cat test.py
-    import decorator
+    import deprecated
 
-    @decorator.deprecated
+    @deprecated.deprecated
     def foo(): pass
 
     def bar():
@@ -39,7 +41,7 @@ Track usage of functions decorated by ``deprecated`` imported from
 .. code-block:: console
 
     > cat test2.py
-    from decorator import deprecated
+    from deprecated import deprecated
 
     @deprecated
     def foo(): pass
@@ -59,7 +61,7 @@ Track usage of functions decorated by ``deprecated`` imported from
 .. code-block:: console
 
     > cat test3.py
-    from decorator import deprecated as dp
+    from deprecated import deprecated as dp
 
     @dp
     def foo(): pass
