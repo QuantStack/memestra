@@ -223,7 +223,6 @@ class SharedCache(object):
 
     def __init__(self):
         shared_dir = os.path.join(sys.prefix, 'share', 'memestra')
-        os.makedirs(shared_dir, exist_ok=True)
         self.cache_entries = {}
 
         for root, dirs, files in os.walk(shared_dir):
