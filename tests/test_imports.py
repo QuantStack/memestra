@@ -245,18 +245,22 @@ class TestImportPkg(TestCase):
             code,
             [('foo', '<>', 4, 4, 'why')])
 
+    @mock.patch.dict(
+        # We have a fake description for gast in tests/share/memestra
+        # Setup the shared cache to use it.
+        os.environ, {"MEMESTRA_PREFIX": os.path.dirname(__file__)}
+    )
     def test_shared_cache(self):
-        # We have a fake description for gast in tests/share/memestra
-        # Setup the shared cache to use it.
-        with mock.patch('sys.prefix', os.path.dirname(__file__)):
-            self.checkDeprecatedUses(
-                'from gast import parse',
-                [('parse', '<>', 1, 0, None)])
+        self.checkDeprecatedUses(
+            'from gast import parse',
+            [('parse', '<>', 1, 0, None)])
 
-    def test_shared_cache_sub(self):
+    @mock.patch.dict(
         # We have a fake description for gast in tests/share/memestra
         # Setup the shared cache to use it.
-        with mock.patch('sys.prefix', os.path.dirname(__file__)):
-            self.checkDeprecatedUses(
-                'from gast.astn import AstToGAst',
-                [('AstToGAst', '<>', 1, 0, 'because')])
+        os.environ, {"MEMESTRA_PREFIX": os.path.dirname(__file__)}
+    )
+    def test_shared_cache_sub(self):
+        self.checkDeprecatedUses(
+            'from gast.astn import AstToGAst',
+            [('AstToGAst', '<>', 1, 0, 'because')])

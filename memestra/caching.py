@@ -222,7 +222,11 @@ class RecursiveCacheKeyFactory(CacheKeyFactoryBase):
 class SharedCache(object):
 
     def __init__(self):
-        shared_dir = os.path.join(sys.prefix, 'share', 'memestra')
+        shared_dir = os.path.join(
+            os.environ.get("MEMESTRA_PREFIX", sys.prefix),
+            'share',
+            'memestra',
+        )
         os.makedirs(shared_dir, exist_ok=True)
         self.cache_entries = {}
 
