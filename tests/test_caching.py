@@ -70,6 +70,16 @@ class TestCaching(TestCase):
         finally:
             shutil.rmtree(tmpdir)
 
+    def test_cache_is_tied_to_interpreter(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            os.environ['XDG_CONFIG_HOME'] = tmpdir
+            cache = memestra.caching.Cache()
+            self.assertIn(
+                os.path.join(*sys.executable.split(os.sep)[1:]),
+                cache.cachedir,
+            )
+
+
 class TestCLI(TestCase):
 
     def test_docparse(self):
