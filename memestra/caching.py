@@ -265,8 +265,15 @@ class Cache(object):
             else:
                 user_config_dir = xdg_config_home
                 memestra_dir = 'memestra'
-            self.cachedir = os.path.expanduser(os.path.join(user_config_dir,
-                                                            memestra_dir))
+
+            # use a path that is dependent on the interpeter version to avoid
+            # polluting the cache from other interpreters
+            interpreter_path = os.path.join(
+                *os.path.abspath(sys.executable).split(os.sep)[1:]
+            )
+            self.cachedir = os.path.expanduser(
+                os.path.join(user_config_dir, memestra_dir, interpreter_path)
+            )
         os.makedirs(self.cachedir, exist_ok=True)
 
     def _get_path(self, key):
