@@ -133,7 +133,7 @@ class ImportResolver(ast.NodeVisitor):
             try:
                 module, syntax_errors = frilouz.parse(ast.parse, fd.read())
             except UnicodeDecodeError:
-                return []
+                return {}
             duc = SilentDefUseChains()
             duc.visit(module)
             anc = beniget.Ancestors()
