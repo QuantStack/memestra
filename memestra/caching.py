@@ -128,6 +128,14 @@ class Format(object):
 
 
 class CacheKeyFactoryBase(object):
+
+    py_version = ".".join(map(str, sys.version_info)).encode()
+
+    class CacheKeyBase(object):
+        def __init__(self):
+            self._hasher = hashlib.sha256()
+            self._hasher.update(CacheKeyFactoryBase.py_version)
+
     def __init__(self, keycls):
         self.keycls = keycls
         self.created = dict()
@@ -154,14 +162,15 @@ class CacheKeyFactory(CacheKeyFactoryBase):
     Only the content of the module is taken into account
     '''
 
-    class CacheKey(object):
+    class CacheKey(CacheKeyFactoryBase.CacheKeyBase):
 
         def __init__(self, module_path, _):
+            super(CacheKeyFactory.CacheKey, self).__init__()
 
             with open(module_path, 'rb') as fd:
                 module_content = fd.read()
-                module_hash = hashlib.sha256(module_content).hexdigest()
-                self.module_hash = module_hash
+                self._hasher.update(module_content)
+                self.module_hash = self._hasher.hexdigest()
 
         @property
         def path(self):
@@ -179,9 +188,10 @@ class RecursiveCacheKeyFactory(CacheKeyFactoryBase):
     key.
     '''
 
-    class CacheKey(object):
+    class CacheKey(CacheKeyFactoryBase.CacheKeyBase):
 
         def __init__(self, module_path, factory):
+            super(RecursiveCacheKeyFactory.CacheKey, self).__init__()
             assert module_path not in factory.created or factory.created[module_path] is None
 
             with open(module_path, 'rb') as fd:
@@ -196,9 +206,7 @@ class RecursiveCacheKeyFactory(CacheKeyFactoryBase):
                     if factory.get(dep, 1) is not None:
                         new_deps.append(dep)
 
-                module_hash = hashlib.sha256(module_content).hexdigest()
-
-                hashes = [module_hash]
+                self._hasher.update(module_content)
 
                 for new_dep in sorted(new_deps):
                     try:
@@ -207,9 +215,9 @@ class RecursiveCacheKeyFactory(CacheKeyFactoryBase):
                     # better?
                     except UnicodeDecodeError:
                         continue
-                    hashes.append(new_dep_key.module_hash)
+                    self._hasher.update(new_dep_key.module_hash.encode())
 
-                self.module_hash = hashlib.sha256("".join(hashes).encode("ascii")).hexdigest()
+                self.module_hash = self._hasher.hexdigest()
 
         @property
         def path(self):
